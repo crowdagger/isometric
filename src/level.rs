@@ -188,11 +188,6 @@ impl<FT:Default+Clone,
         // Special case of tile of the POV
         res[radius][radius] = true;
 
-        let start_x = if radius > pos.0 { 0 } else { pos.0 - radius };
-        let end_x = if pos.0 + radius > self.width - 1 { self.width - 1 } else { pos.0 + radius };
-        let start_y = if radius > pos.1 { 0 } else { pos.1 - radius };
-        let end_y = if pos.1 + radius > self.height - 1 { self.height - 1 } else { pos.1 + radius };
-
         let steps = 10 * radius;
         let dtheta: f32 = 2.0 * f32::consts::PI / (steps as f32);
         let two_pies = 2.0 * f32::consts::PI;
@@ -237,8 +232,6 @@ impl<FT:Default+Clone,
                     prev_x = abs_x;
                     prev_y = abs_y;
                 } else {
-                    let i = (x as f32).round() as isize + radius as isize;
-                    let j = (y as f32).round() as isize + radius as isize;
                     break;
                 }
             }

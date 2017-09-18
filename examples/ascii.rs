@@ -2,7 +2,6 @@ extern crate isometric;
 
 use isometric::Level;
 use std::io;
-use std::io::Read;
 
 fn main() {
     let mut level: Level = Level::new(10, 10, 0.0);
@@ -14,7 +13,7 @@ fn main() {
     level.add_cliff_walls(1.0);
     let mut pos = (0, 0);
     let mut new_pos = (0, 0);
-    while true {
+    loop {
         if level.is_move_possible(pos, new_pos) {
             pos = new_pos;
         }
