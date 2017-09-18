@@ -1,0 +1,9 @@
+[package]
+name = "isometric"
+version = "0.1.0"
+authors = ["Elisabeth Henry <liz.henry@ouvaton.org>"]
+description = "A rust library to create and render isometric worlds"
+readme = "README.md"
+keywords = ["isometric", "gamedev"]
+license = "MIT/Apache-2.0"
+
