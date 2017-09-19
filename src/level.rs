@@ -52,6 +52,16 @@ impl<FT:Default+Clone,
         }
     }
 
+    /// Returns the width of a level
+    pub fn get_width(&self) -> usize {
+        self.width
+    }
+
+    /// Returns the depth of a level
+    pub fn get_depth(&self) -> usize {
+        self.height
+    }
+
     /// Get the z value (height level in the world) of a tile
     ///
     /// x must be strictly less than level's width and
