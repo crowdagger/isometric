@@ -17,6 +17,8 @@ use glium::Frame;
 use glium::Surface;
 use glium::Display;
 
+use image;
+
 use std::default::Default;
 
 #[derive(Copy, Clone, Debug)]
@@ -60,35 +62,34 @@ impl<FT:Clone+Default,
         let c = [x, y, other_z];
         let d = [x + 1.0, y, other_z];
         let normal = [0.0, -1.0, 0.0];
-        let tex_coords = [0.0, 0.0];
         vertices.push(Vertex {
             position: a,
-            tex_coords: tex_coords,
+            tex_coords: [0.0, 1.0],
             normal: normal
         });
         vertices.push(Vertex {
             position: b,
-            tex_coords: tex_coords,
+            tex_coords: [1.0, 0.0],
             normal: normal
         });
         vertices.push(Vertex {
             position: c,
-            tex_coords: tex_coords,
+            tex_coords: [0.0, 1.0],
             normal: normal
         });
         vertices.push(Vertex {
             position: b,
-            tex_coords: tex_coords,
+            tex_coords: [1.0, 0.0],
             normal: normal
         });
         vertices.push(Vertex {
             position: d,
-            tex_coords: tex_coords,
+            tex_coords: [1.0, 1.0],
             normal: normal
         });
         vertices.push(Vertex {
             position: c,
-            tex_coords: tex_coords,
+            tex_coords: [0.0, 1.0],
             normal: normal
         });
     }
@@ -110,35 +111,34 @@ impl<FT:Clone+Default,
             let c = [x, y, other_z];
             let d = [x, y + 1.0, other_z];
             let normal = [-1.0, 0.0, 0.0];
-            let tex_coords = [0.0, 0.0];
             vertices.push(Vertex {
                 position: a,
-                tex_coords: tex_coords,
+                tex_coords: [0.0, 0.0],
                 normal: normal
             });
             vertices.push(Vertex {
                 position: b,
-                tex_coords: tex_coords,
+                tex_coords: [1.0, 0.0],
                 normal: normal
             });
             vertices.push(Vertex {
                 position: c,
-                tex_coords: tex_coords,
+                tex_coords: [0.0, 1.0],
                 normal: normal
             });
             vertices.push(Vertex {
                 position: b,
-                tex_coords: tex_coords,
+                tex_coords: [1.0, 0.0],
                 normal: normal
             });
             vertices.push(Vertex {
                 position: d,
-                tex_coords: tex_coords,
+                tex_coords: [1.0, 1.0],
                 normal: normal
             });
             vertices.push(Vertex {
                 position: c,
-                tex_coords: tex_coords,
+                tex_coords: [0.0, 1.0],
                 normal: normal
             });
         }
@@ -251,14 +251,13 @@ impl<FT:Clone+Default,
 
                 // Finally build the four vertices
                 let a = [x as f32, y as f32, sum_a / div_a];
-                let ta = [0.0, 0.0];
+                let ta = [0.0 + a[0] / (width as f32 + 1.0), 0.0 + a[1] / (width as f32 + 1.0)];
                 let b = [(x + 1) as f32, y as f32, sum_b / div_b];
-                let tb = [1.0, 0.0];
+                let tb = [0.0 + b[0] / (width as f32 + 1.0), 0.0 + b[1] / (width as f32 + 1.0)];
                 let c = [x as f32, (y + 1) as f32, sum_c / div_c];
-                let tc = [0.0, 1.0];
+                let tc = [0.0 + c[0] / (width as f32 + 1.0), 0.0 + c[1] / (width as f32 + 1.0)];
                 let d = [(x + 1) as f32, (y + 1) as f32, sum_d / div_d];
-                let td = [1.0, 1.0];
-                let td = [d[0] / (width + 1) as f32, d[1] / (depth + 1) as f32];
+                let td = [0.0 + d[0] / (width as f32 + 1.0), 0.0 + d[1] / (width as f32 + 1.0)];
                 let normal = [0.0, 0.0, 1.0];
                 vertices.push(Vertex {
                     position: a,
@@ -319,10 +318,22 @@ impl<FT:Clone+Default,
         let v3 = 3.0f32.sqrt();
 
         let pos = [5.0, t, 0.0];
-        let y_ratio = 20.0;
+        let y_ratio = 5.0;
         let x_ratio = y_ratio;
-        let z_ratio = y_ratio;
-        
+        let z_ratio = 0.5 * y_ratio;
+
+        use std::io::Cursor;
+        let image = image::load(Cursor::new(&include_bytes!("../assets/floor_1.png")[..]),
+                                image::PNG).unwrap().to_rgba();
+        let image_dimensions = image.dimensions();
+        let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw()[..], image_dimensions);
+        let floor_texture = glium::texture::Texture2d::new(display, image).unwrap();
+        let image = image::load(Cursor::new(&include_bytes!("../assets/wall_1.png")[..]),
+                                image::PNG).unwrap().to_rgba();
+        let image_dimensions = image.dimensions();
+        let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw()[..], image_dimensions);
+        let wall_texture = glium::texture::Texture2d::new(display, image).unwrap();
+
         
         let uniforms = uniform! {
             perspective: [
@@ -330,9 +341,9 @@ impl<FT:Clone+Default,
 //                [0.0, 2.0/v6, -v2/v6, 0.0],
 //                [-v3 / v6, 1.0/v6, v2/v6, 0.0],
                 //                [0.0, 0.0, 0.0, 1.0f32]
-                [v3 / ( 2.0 * aspect_ratio), 0.5, 1.0/(x_ratio + y_ratio + z_ratio), 0.0],
-                [-v3 / (2.0 * aspect_ratio), 0.5, 1.0/(x_ratio + y_ratio + z_ratio), 0.0],
-                [0.0, 1.0, 1.0/(x_ratio + y_ratio + z_ratio), 0.0],
+                [v3 / ( 2.0 * aspect_ratio), 0.5, 0.5/(x_ratio + y_ratio + z_ratio), 0.0],
+                [-v3 / (2.0 * aspect_ratio), 0.5, 0.5/(x_ratio + y_ratio + z_ratio), 0.0],
+                [0.0, 1.0, -1.0/(x_ratio + y_ratio + z_ratio), 0.0],
                 [0.0, 0.0, 0.0, 1.0f32]
                 //[0.5, -0.5, 0.0, 0.0],
                 //[v3/2.0, v3/2.0, 1.0, 0.0],
@@ -352,6 +363,11 @@ impl<FT:Clone+Default,
                 [0.0, 0.0, 1.0/z_ratio, 0.0],
                 [-pos[0]/x_ratio, -pos[1]/y_ratio, -pos[2]/z_ratio, 1.0f32]
             ],
+            tex: &floor_texture,
+            v_light: [1.0, 0.0, 0.0f32],
+            light_color: [1.0, 1.0, 1.0f32],
+            dark_color: [0.75, 0.75, 1.0f32],
+            wood_tex: &wall_texture,
         };
 
 
@@ -365,10 +381,13 @@ out vec2 v_tex_coords;
 
 uniform mat4 perspective;
 uniform mat4 view;
-uniform vec2 tex_coords;
+in vec2 tex_coords;
+in vec3 normal;
+out vec3 v_normal;
 
 void main() {
-    v_tex_coords = vec2(position[0]/10.0, position[1]/10.0);
+    v_tex_coords = tex_coords;
+    v_normal = normal;
     gl_Position = perspective * view * vec4(position, 1.0);
 }
 ",
@@ -376,9 +395,17 @@ void main() {
 #version 140
 out vec4 color;
 in vec2 v_tex_coords;
+in vec3 v_normal;
+
+uniform sampler2D tex;
+uniform vec3 v_light;
+uniform vec3 light_color;
+uniform vec3 dark_color;
 
 void main() {
-    color = vec4(v_tex_coords[0], v_tex_coords[1], 0.0, 1.0);
+    float brightness = dot(normalize(v_normal), normalize(v_light));
+    vec4 ratio = vec4(mix(dark_color, light_color, brightness), 1.0);
+    color = ratio * texture(tex, v_tex_coords);
 }
 ",
                      }).unwrap();
@@ -393,10 +420,13 @@ out vec2 v_tex_coords;
 
 uniform mat4 perspective;
 uniform mat4 view;
-uniform vec2 tex_coords;
+in vec2 tex_coords;
+in vec3 normal;
+out vec3 v_normal;
 
 void main() {
     v_tex_coords = tex_coords;
+    v_normal = normal;
     gl_Position = perspective * view * vec4(position, 1.0);
 }
 ",
@@ -404,9 +434,17 @@ void main() {
 #version 140
 out vec4 color;
 in vec2 v_tex_coords;
+in vec3 v_normal;
+
+uniform sampler2D wood_tex;
+uniform vec3 v_light;
+uniform vec3 light_color;
+uniform vec3 dark_color;
 
 void main() {
-    color = vec4(1.0, 0.0, 0.0, 1.0);
+    float brightness = dot(normalize(v_normal), normalize(v_light));
+    vec4 ratio = vec4(mix(dark_color, light_color, brightness), 1.0);
+    color = ratio * texture(wood_tex, v_tex_coords);
 }
 ",
                      }).unwrap();
@@ -424,6 +462,42 @@ void main() {
         frame.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
         frame.draw(&vertex_buffer, &indices, &program, &uniforms, &params).unwrap();
         frame.draw(&vertex_buffer_w, &indices_w, &program_w, &uniforms, &params).unwrap();
+
+        let vertices = vec![
+            Vertex{
+                position: [2.0 -0.5, 2.5, 0.0],
+                normal: [-1.0, -1.0, 0.0],
+                tex_coords: [0.0, 0.0]
+            },
+            Vertex{
+                position: [2.5, 2.0 - 0.5, 0.0],
+                normal: [-1.0, -1.0, 0.0],
+                tex_coords: [0.0, 1.0]
+            },
+            Vertex{
+                position: [1.5, 2.5, 1.0],
+                normal: [-1.0, -1.0, 0.0],
+                tex_coords: [1.0, 0.0]
+            },
+            Vertex{
+                position: [2.5, 1.5, 0.0],
+                normal: [-1.0, -1.0, 0.0],
+                tex_coords: [0.0, 1.0]
+            },
+            Vertex{
+                position: [2.5, 1.5, 1.0],
+                normal: [-1.0, -1.0, 0.0],
+                tex_coords: [1.0, 1.0]
+            },
+            Vertex{
+                position: [1.5, 2.5, 1.0],
+                normal: [-1.0, -1.0, 0.0],
+                tex_coords: [1.0, 0.0]
+            },
+            ];
+        let new_vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
+        let new_indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+        frame.draw(&new_vertex_buffer, &new_indices, &program_w, &uniforms, &params).unwrap();
         frame.finish().unwrap();
     }
 }

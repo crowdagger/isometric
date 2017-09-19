@@ -9,3 +9,4 @@ license = "MIT/Apache-2.0"
 
 [dependencies]
 glium = "0.17"
+image = "0.15"

@@ -7,15 +7,30 @@ use isometric::Renderer;
 use glium::glutin::{Event, WindowEvent};
 
 fn main() {
-    let mut level: Level = Level::new(100, 100, 0.0);
+    let mut level: Level = Level::new(20, 20, 0.0);
+    {
+        let mut wall = level.get_wall_mut(2, 2);
+//        wall.bottom = true;
+//        wall.left = true;
+    }
+    level.set_z(0, 0, 0.1);
+    level.set_z(0, 1, 0.2);
+    level.set_z(1, 0, 0.15);
+    level.set_z(1, 1, 0.2);
+    level.set_z(2, 1, 0.0);
+    level.set_z(3, 1, 0.2);
+    level.set_z(4, 1, 0.1);
+    level.set_z(3, 2, 0.1);
+    level.set_z(2, 2, 0.0);
+    level.set_z(2, 3, 0.1);
     level.set_z(4, 4, 1.0);
     level.set_z(5, 4, 2.0);
     level.set_z(6, 4, 3.0);
     level.set_z(6, 5, 4.0);
     level.set_z(6, 6, 5.0);
 //    level.set_z(5, 4, 1.0);
-    level.add_border_walls();
-    level.add_cliff_walls(0.1);
+//    level.add_border_walls();
+    level.add_cliff_walls(0.5);
     let mut renderer = Renderer::new(level);
 
     let mut events_loop = glium::glutin::EventsLoop::new();
@@ -40,6 +55,6 @@ fn main() {
             }
         });
         renderer.render(&display, t);
-        t += 0.02;
+        t += 0.1
     }
 }
