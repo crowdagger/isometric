@@ -17,7 +17,9 @@ extern crate image;
 mod level;
 mod display;
 mod wall;
+mod camera;
 
 pub use level::Level;
 pub use wall::Wall;
 pub use display::Renderer;
+pub use camera::Camera;

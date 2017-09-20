@@ -37,6 +37,11 @@ impl Camera {
         }
     }
 
+    /// Retuns an array containing the positions of the camera
+    pub fn pos(&self) -> [f32; 3] {
+        self.pos
+    }
+    
     /// Set x and y position of the camera
     pub fn set_pos(&mut self, x: f32, y: f32, z: f32) -> &mut Self {
         self.pos[0] = x;

@@ -22,11 +22,11 @@ use std::f32;
 pub struct Level<FT=(),
                  WT=()> {
     width: usize,
-    height: usize,
+    depth: usize,
     floor: Vec<f32>,
     floor_data: Vec<FT>,
-    wall_data: Vec<WT>,
-    walls: Vec<Wall>,
+    walls_h: Vec<Option<WT>>,
+    walls_v: Vec<Option<WT>>,
 }
 
 impl<FT:Default+Clone,
@@ -39,35 +39,54 @@ impl<FT:Default+Clone,
     /// Creates a new `Level` with default z set to 0.0.
     ///
     /// x axis will go from 0 to `width`.
-    /// y axis will go from 0 to `height`.
+    /// y axis will go from 0 to `depth`.
     /// `default_z` is the default height in the world
-    pub fn new(width: usize, height: usize, default_z: f32) -> Level<FT,WT> {
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use isometric::{Level, Wall};
+    ///
+    /// // Type annotation is necessary to use default parametric types (())
+    /// let mut level: Level = Level::new(10, 10, 0.0);
+    ///
+    /// // Level is empty, so adjacent move is possible
+    /// assert_eq!(level.is_move_possible((0, 2), (0, 3)), true);
+    ///
+    /// // Add a wall between (0, 2) and (0, 3)
+    /// level.set_wall(0, 2, Wall::Top, Some(()));
+    ///
+    /// // Move between (0, 2) and (0, 3) is no longer possible
+    /// assert_eq!(level.is_move_possible((0, 2), (0, 3)), false);
+    /// ```
+
+    pub fn new(width: usize, depth: usize, default_z: f32) -> Level<FT,WT> {
         Level {
             width: width,
-            height: height,
-            floor: vec![default_z ; width * height],
-            walls: vec![Wall::none() ; width * height],
-            floor_data: vec![FT::default() ; width * height],
-            wall_data: vec![WT::default() ; width * height],
+            depth: depth,
+            floor: vec![default_z ; width * depth],
+            walls_h: vec![None; (depth + 1) * width],
+            walls_v: vec![None; (width  + 1) * depth],
+            floor_data: vec![FT::default() ; width * depth],
         }
     }
 
     /// Returns the width of a level
-    pub fn get_width(&self) -> usize {
+    pub fn width(&self) -> usize {
         self.width
     }
 
     /// Returns the depth of a level
-    pub fn get_depth(&self) -> usize {
-        self.height
+    pub fn depth(&self) -> usize {
+        self.depth
     }
 
     /// Get the z value (height level in the world) of a tile
     ///
     /// x must be strictly less than level's width and
     /// y must be strictly less than level's height
-    pub fn get_z(&self, x: usize, y: usize) -> f32 {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
+    pub fn z(&self, x: usize, y: usize) -> f32 {
+        debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds");
         let i = self.get_index(x, y);
         self.floor[i]
     }
@@ -77,41 +96,73 @@ impl<FT:Default+Clone,
     /// x must be strictly less than level's width and
     /// y must be strictly less than level's height
     pub fn set_z(&mut self, x: usize, y: usize, z: f32) -> &mut Self {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
+        debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds");
         let i = self.get_index(x, y);
         self.floor[i] = z;
         self
     }
 
-    /// Get a reference to a tile's walls (so you can check it)
-    pub fn get_wall_ref(&self, x: usize, y: usize) -> &Wall {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
-        let i = self.get_index(x, y);
-        &self.walls[i]
+    /// Returns the height of a corner.
+    ///
+    /// A tile has four corners (yeah): (x, y) to (x+1, y +1). Therefore,
+    /// the indice of corner can go one step further than the tile's index
+    /// (max is width and depth instead of width - 1 and depth - 1).
+    ///
+    /// A corner's height is averaged from the neighboring tiles (if any),
+    /// except if said tiles have a wall between them.
+    // pub fn z_corner(&mut self, x: usize, y: usize) -> f32 {
+    //         debug_assert!(x <= self.width && y <= self.depth, "x and y must be in level's bounds");
+    //     let mut z = 0.0;
+    //     let mut div_z = 0.0;
+        
+        
+    //     return z / div_z;
+    // }
+
+
+    /// Returns the wall's data (if any) at a tile's position or None if there isn't.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use isometric::{Level, Wall};
+    /// let level: Level = Level::new(10, 10, 0.0);
+    /// assert!(level.wall(1, 1, Wall::Left).is_none());
+    /// ```
+    pub fn wall(&self, x: usize, y: usize, wall: Wall) -> &Option<WT> {
+        debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds");
+        match wall {
+            Wall::Bottom => &self.walls_h[x * (self.depth + 1) + y],
+            Wall::Left => &self.walls_v[y * (self.width + 1) + x],
+            Wall::Right => &self.walls_v[y * (self.width + 1) + x + 1],
+            Wall::Top => &self.walls_h[x * (self.depth + 1) + y + 1],
+        }
     }
 
-    /// Get a mutable access to a tile's walls (so you can add/remove walls to it)
-    pub fn get_wall_mut(&mut self, x: usize, y: usize) -> &mut Wall {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
-        let i = self.get_index(x, y);
-        &mut self.walls[i]
+    /// Sets the wall at tile x, y. To remove the wall, set it to `None`.
+    pub fn set_wall(&mut self, x: usize, y: usize, wall: Wall, data: Option<WT>) {
+        debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds; ({}, {}) when bounds are ({}, {})", x, y, self.width, self.depth);
+        match wall {
+            Wall::Bottom => self.walls_h[x * (self.depth + 1) + y] = data,
+            Wall::Left => self.walls_v[y * (self.width + 1) + x] = data,
+            Wall::Right => self.walls_v[y * (self.width + 1) + x + 1] = data,
+            Wall::Top => self.walls_h[x * (self.depth + 1) + y + 1] = data,
+        }
     }
 
     /// Add walls to the border of the levels
     ///
     /// (bottom wall at y = 0, left wall at x = 0, and so on)
     pub fn add_border_walls(&mut self) {
+        let depth = self.depth;
+        let width = self.width;
         for x in 0..self.width {
-            let i = self.get_index(x, 0);
-            let j = self.get_index(x, self.height - 1);
-            self.walls[i].bottom = true;
-            self.walls[j].top = true;
+            self.set_wall(x, 0, Wall::Bottom, Some(WT::default()));
+            self.set_wall(x, depth - 1, Wall::Top, Some(WT::default()));
         }
-        for y in 0..self.height {
-            let i = self.get_index(0, y);
-            let j = self.get_index(self.width - 1, y);
-            self.walls[i].left = true;
-            self.walls[j].right = true;
+        for y in 0..self.depth {
+            self.set_wall(0, y, Wall::Left, Some(WT::default()));
+            self.set_wall(width - 1, y, Wall::Right, Some(WT::default()));
         }
     }
 
@@ -119,16 +170,16 @@ impl<FT:Default+Clone,
     /// the two is superior or equal to the given threshold.
     pub fn add_cliff_walls(&mut self, threshold: f32) {
         for x in 0..(self.width - 1) {
-            for y in 0..(self.height - 1) {
-                let z = self.get_z(x, y);
-                let z_right = self.get_z(x + 1, y);
-                let z_top = self.get_z(x, y + 1);
+            for y in 0..(self.depth - 1) {
+                let z = self.z(x, y);
+                let z_right = self.z(x + 1, y);
+                let z_top = self.z(x, y + 1);
 
                 if (z - z_top).abs() >= threshold {
-                    self.get_wall_mut(x, y).top = true;
+                    self.set_wall(x, y, Wall::Top, Some(WT::default()));
                 }
                 if (z - z_right).abs() >= threshold {
-                    self.get_wall_mut(x, y).right = true;
+                    self.set_wall(x, y, Wall::Right, Some(WT::default()));
                 }
             }
         }
@@ -147,7 +198,7 @@ impl<FT:Default+Clone,
             // Trivially true, though useless
             return true;
         }
-        if end_pos.0 >= self.width || end_pos.1 >= self.height {
+        if end_pos.0 >= self.width || end_pos.1 >= self.depth {
             return false;
         }
         
@@ -173,17 +224,50 @@ impl<FT:Default+Clone,
                         self.is_move_possible(intermediate, end_pos)
                 }
         } else {
-            let wall_start = self.get_wall_ref(start_pos.0, start_pos.1);
-            let wall_end = self.get_wall_ref(end_pos.0, end_pos.1);
             match (dx, dy) {
-                (1, 0) => !wall_start.right && !wall_end.left,
-                (-1, 0) => !wall_start.left && !wall_end.right,
-                (0, 1) => !wall_start.top && !wall_end.bottom,
-                (0, -1) => !wall_start.bottom && !wall_end.top,
+                (1, 0) => self.wall(start_pos.0, start_pos.1, Wall::Right).is_none(),
+                (-1, 0) => self.wall(start_pos.0, start_pos.1, Wall::Left).is_none(),
+                (0, 1) => self.wall(start_pos.0, start_pos.1, Wall::Top).is_none(),
+                (0, -1) => self.wall(start_pos.0, start_pos.1, Wall::Bottom).is_none(),
                 (_, _) => unreachable!(),
             } 
         }
     }
+
+    /// Convenience method wrapping `visible_from`, returning a closure instead of
+    /// a vector.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use isometric::Level;
+    ///
+    /// let mut level: Level = Level::new(20, 20, 0.0);
+    /// let f = level.visibility((5, 5), 3);
+    ///
+    /// // You can now "ask" f whether some tile if visible from initial pos
+    /// assert_eq!(f(4, 3), true);
+    ///
+    /// // Out of bounds range will simply return false
+    /// assert_eq!(f(1000, 1000), false);
+    /// ```
+    pub fn visibility(&self, pos: (usize, usize), radius: usize) -> Box<Fn(usize, usize) -> bool> {
+        let matrix = self.visible_from(pos, radius);
+
+        let upper_bound = (if pos.0 + radius >= self.width() - 1 { self.width() - 1 } else { pos.0 + radius },
+                           if pos.1 + radius >= self.width() - 1 { self.depth() - 1 } else { pos.1 + radius });
+        let lower_bound = (if pos.0 > radius { pos.0 - radius } else { 0 },
+                           if pos.1 > radius { pos.1 - radius } else { 0 });
+
+        Box::new(move |x, y| {
+            if x < lower_bound.0 || x > upper_bound.0 || y < lower_bound.1 || y > upper_bound.1 {
+                false
+            } else {
+                matrix[x + radius - pos.0][y + radius - pos.1]
+            }
+        })
+    }
+    
 
     /// Returns a "visibility" matrix of bools centered on the pos view.
     ///
@@ -257,7 +341,7 @@ impl<FT:Default+Clone,
     pub fn to_ascii(&self, pos: (usize, usize), radius: usize) -> String {
         let mut res = String::new();
         let visible = self.visible_from(pos, radius);
-        for y in 0..self.height {
+        for y in 0..self.depth {
             for x in 0..self.width {
                 if (x, y) == pos {
                     res.push_str(" @ ");
@@ -273,24 +357,23 @@ impl<FT:Default+Clone,
                     res.push_str("###");
                     continue;
                 }
-                let wall = self.get_wall_ref(x, y);
-                if wall.left {
+                if self.wall(x, y, Wall::Left).is_some() {
                     res.push('|'); 
                 } else {
                     res.push(' ');
                 }
-                if wall.top && wall.bottom {
+                if self.wall(x, y, Wall::Top).is_some() && self.wall(x, y, Wall::Bottom).is_some() {
                     res.push('=');
-                } else if wall.top {
+                } else if self.wall(x, y, Wall::Top).is_some() {
                     // reverted because display reverted
                     res.push('_');
-                } else if wall.bottom {
+                } else if self.wall(x, y, Wall::Bottom).is_some() {
                     // reverted because display reverted
                     res.push('-');
                 } else {
                     res.push(' ');
                 }
-                if wall.right {
+                if self.wall(x, y, Wall::Right).is_some() {
                     res.push('|'); 
                 } else {
                     res.push(' ');
@@ -303,32 +386,18 @@ impl<FT:Default+Clone,
 
     /// Sets the value of custom floor data (e.g. the tile's representation)
     pub fn set_floor_data(&mut self, x: usize, y: usize, data: FT) {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
+        debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds");
         let i = self.get_index(x, y);
         self.floor_data[i] = data;
     }
 
     /// Gets a reference to custom floor data (e.g. the tile's representation)
-    pub fn get_floor_data(&self, x: usize, y: usize) -> &FT {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
+    pub fn floor_data(&self, x: usize, y: usize) -> &FT {
+        debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds");
         let i = self.get_index(x, y);
         &self.floor_data[i]
     }
-
-    /// Sets the value of custom wall data (e.g. the wall's potential representation)
-    pub fn set_wall_data(&mut self, x: usize, y: usize, data: WT) {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
-        let i = self.get_index(x, y);
-        self.wall_data[i] = data;
-    }
-
-    /// Gets a reference to custom wall data (e.g. the wall's potential representation)
-    pub fn get_wall_data(&self, x: usize, y: usize) -> &WT {
-        debug_assert!(x < self.width && y < self.height, "x and y must be in level's bounds");
-        let i = self.get_index(x, y);
-        &self.wall_data[i]
-    }
-    }
+}
 
 
 #[test]
@@ -340,9 +409,9 @@ fn default_z() {
     for x in 0..10 {
         for y in 0..10 {
             if x != y {
-                assert_eq!(level.get_z(x, y), 10.0);
+                assert_eq!(level.z(x, y), 10.0);
             } else {
-                assert_eq!(level.get_z(x, y), 42.0);
+                assert_eq!(level.z(x, y), 42.0);
             }
         }
     }
@@ -352,37 +421,25 @@ fn default_z() {
 #[should_panic]
 fn invalid_x() {
     let level: Level = Level::new(10, 10, 0.0);
-    level.get_z(10, 0);
+    level.z(10, 0);
 }
 
 #[test]
 #[should_panic]
 fn invalid_y() {
     let level: Level = Level::new(10, 10, 0.0);
-    level.get_z(0, 10);
-}
-
-#[test]
-fn set_wall() {
-    let mut level: Level = Level::new(20, 20, 0.0);
-    {
-        let mut wall = level.get_wall_mut(5,5);
-        wall.top = true;
-        wall.left = true;
-    }
-    assert!(level.get_wall_ref(2, 2).is_none());
-    assert!(!level.get_wall_ref(5, 5).is_none());
+    level.z(0, 10);
 }
 
 #[test]
 fn border_walls() {
     let mut level: Level = Level::new(20, 20, 0.0);
     level.add_border_walls();
-    assert_eq!(level.get_wall_ref(4, 0).bottom, true);
-    assert_eq!(level.get_wall_ref(6, 19).top, true);
-    assert_eq!(level.get_wall_ref(0, 12).left, true);
-    assert_eq!(level.get_wall_ref(19, 7).right, true);
-    assert!(level.get_wall_ref(2, 2).is_none());
+    assert!(level.wall(4, 0, Wall::Bottom).is_some());
+    assert!(level.wall(6, 19, Wall::Top).is_some());
+    assert!(level.wall(0, 12, Wall::Left).is_some());
+    assert!(level.wall(19, 7, Wall::Right).is_some());
+    assert!(level.wall(2, 2, Wall::Right).is_none());
 }
 
 #[test]
@@ -412,7 +469,7 @@ fn moves() {
     assert_eq!(level.is_move_possible((9, 9), (9, 10)), false);
 
     // Add a wall, move no longer possible
-    level.get_wall_mut(0, 0).right = true;
+    level.set_wall(0, 0, Wall::Right, Some(()));
     assert_eq!(level.is_move_possible((0, 0), (1, 0)), false);
 }
 
@@ -436,14 +493,15 @@ fn test_cliffs() {
 fn floor_data() {
     let mut level: Level<i32, i32> = Level::new(10, 10, 0.0);
     level.set_floor_data(4, 4, 42);
-    assert_eq!(level.get_floor_data(4, 4), &42);
-    assert_eq!(level.get_floor_data(0, 0), &0);
+    assert_eq!(level.floor_data(4, 4), &42);
+    assert_eq!(level.floor_data(0, 0), &0);
 }
 
 #[test]
 fn wall_data() {
     let mut level: Level<i32, i32> = Level::new(10, 10, 0.0);
-    level.set_wall_data(4, 4, 42);
-    assert_eq!(level.get_wall_data(4, 4), &42);
-    assert_eq!(level.get_wall_data(0, 0), &0);
+    level.set_wall(4, 4, Wall::Right, Some(42));
+    assert_eq!(level.wall(4, 4, Wall::Right).unwrap(), 42);
+    assert_eq!(level.wall(5, 4, Wall::Left).unwrap(), 42);
+    assert!(level.wall(0, 0, Wall::Right).is_none());
 }

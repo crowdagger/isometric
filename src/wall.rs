@@ -11,38 +11,14 @@
 // dual licensed as above, without any additional terms or conditions.
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-/// Represents a wall inside the level.
-///
-/// A wall prevents the player from moving into adjacent tiles,
-/// and should usually be displayed in some manner.
-pub struct Wall {
-    pub top: bool,
-    pub bottom: bool,
-    pub left: bool,
-    pub right: bool,
-}
-
-impl Wall {
-    /// Creates a new wall representation with no wall at all
-    pub fn none() -> Self {
-        Wall {
-            top: false,
-            bottom: false,
-            left: false,
-            right: false,
-        }
-    }
-
-    /// Returns true if there is no wall at all, false else
-    pub fn is_none(&self) -> bool {
-        *self == Wall::none()
-    }
-}
-
-#[test]
-fn wall_none() {
-    let mut wall = Wall::none();
-    wall.top = true;
-    wall.top = false;
-    assert!(wall.is_none());
+/// Represents the position of a wall
+pub enum Wall {
+    /// Wall is at the left (wall with tile: (x - 1, y))
+    Left,
+    /// Wall is at the right (wall with tile: (x + 1, y))
+    Right,
+    /// Wall is at the top (wall with tile: (x, y + 1))
+    Top,
+    /// Wall is at the bottom (wall with tile: (x, y - 1))
+    Bottom,
 }

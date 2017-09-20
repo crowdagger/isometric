@@ -11,15 +11,18 @@
 // dual licensed as above, without any additional terms or conditions.
 
 use level::Level;
+use camera::Camera;
+use wall::Wall;
 
 use glium;
-use glium::Frame;
 use glium::Surface;
 use glium::Display;
+use glium::program::Program;
 
 use image;
 
 use std::default::Default;
+use std::io::Cursor;
 
 #[derive(Copy, Clone, Debug)]
 struct Vertex {
@@ -31,16 +34,25 @@ struct Vertex {
 implement_vertex!(Vertex, position, tex_coords, normal);
 
 /// Contains a level and add methods to render it
-pub struct Renderer<FT=(), WT=()> {
+pub struct Renderer<'a, FT=(), WT=()> {
     level: Level<FT, WT>,
+    display: &'a Display,
+    program: Program,
 }
 
-impl<FT:Clone+Default,
-     WT:Clone+Default> Renderer<FT, WT> {
+impl<'a,
+     FT:Clone+Default,
+     WT:Clone+Default> Renderer<'a, FT, WT> {
     /// Creates a new renderer from an existing level and a glutin display
-    pub fn new(level: Level<FT, WT>) -> Renderer<FT, WT> {
+    pub fn new(level: Level<FT, WT>, display: &'a Display) -> Renderer<'a, FT, WT> {
         Renderer {
-            level: level
+            level: level,
+            display: display,
+            program: program!(display,
+                              140 => {
+                                  vertex: include_str!("../shaders/renderer.glslv"),
+                                  fragment: include_str!("../shaders/renderer.glslf"),
+                     }).unwrap(),
         }
     }
 
@@ -54,6 +66,7 @@ impl<FT:Clone+Default,
         &mut self.level
     }
 
+    // Add vertical wall to the vertices
     fn add_horizontal_wall(&self, vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
         let x = x as f32;
         let y = y as f32;
@@ -93,17 +106,9 @@ impl<FT:Clone+Default,
             normal: normal
         });
     }
-    
-    /// Return the vertices corresponding to the walls' data
-    fn get_vertices_walls(&self) -> Vec<Vertex> {
-        let mut vertices = vec!();
-        let level = self.level();
-        let width = level.get_width();
-        let depth = level.get_depth();
 
-        
-
-        fn add_vertical_wall(vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
+    // Add horizontal wall to the vertices
+    fn add_vertical_wall(&self, vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
             let x = x as f32;
             let y = y as f32;
             let a = [x, y, z];
@@ -135,44 +140,50 @@ impl<FT:Clone+Default,
                 position: d,
                 tex_coords: [1.0, 1.0],
                 normal: normal
-            });
+             });
             vertices.push(Vertex {
                 position: c,
                 tex_coords: [0.0, 1.0],
                 normal: normal
             });
         }
-        
+    
+    /// Return the vertices corresponding to the walls' data
+    fn get_vertices_walls(&self) -> Vec<Vertex> {
+        let mut vertices = vec!();
+        let level = self.level();
+        let width = level.width();
+        let depth = level.depth();
+
         for x in 0..width {
             for y in 0..depth {
-                let wall = level.get_wall_ref(x, y);
-                let z = level.get_z(x, y);
-                if wall.bottom {
+                let z = level.z(x, y);
+                if level.wall(x, y, Wall::Bottom).is_some() {
                     if y == 0 {
                         self.add_horizontal_wall(&mut vertices, x, y, z, z + 1.0);
                     } else {
-                        self.add_horizontal_wall(&mut vertices, x, y, z, level.get_z(x, y - 1));
+                        self.add_horizontal_wall(&mut vertices, x, y, z, level.z(x, y - 1));
                     }
                 }
-                if wall.left {
+                if level.wall(x, y, Wall::Left).is_some() {
                     if x == 0 {
-                        add_vertical_wall(&mut vertices, x, y, z, z + 1.0);
+                        self.add_vertical_wall(&mut vertices, x, y, z, z + 1.0);
                     } else {
-                        add_vertical_wall(&mut vertices, x, y, z, level.get_z(x - 1, y));
+                        self.add_vertical_wall(&mut vertices, x, y, z, level.z(x - 1, y));
                     }
                 }
-                if wall.top  {
+                if level.wall(x, y, Wall::Top).is_some() {
                     if y == depth - 1 {
                         self.add_horizontal_wall(&mut vertices, x, y + 1, z, z + 1.0);
                     } else {
-                        self.add_horizontal_wall(&mut vertices, x, y + 1, z, level.get_z(x, y + 1));
+                        self.add_horizontal_wall(&mut vertices, x, y + 1, z, level.z(x, y + 1));
                     }
                 }
-                if wall.right {
+                if level.wall(x, y, Wall::Right).is_some()  {
                     if x == width - 1 {
-                        add_vertical_wall(&mut vertices, x + 1, y, z, z + 1.0);
+                        self.add_vertical_wall(&mut vertices, x + 1, y, z, z + 1.0);
                     } else {
-                        add_vertical_wall(&mut vertices, x + 1, y, z, level.get_z(x + 1, y));
+                        self.add_vertical_wall(&mut vertices, x + 1, y, z, level.z(x + 1, y));
                     }
                 }
             }
@@ -184,11 +195,11 @@ impl<FT:Clone+Default,
     fn get_vertices(&self) -> Vec<Vertex> {
         let mut vertices = vec!();
         let level = self.level();
-        let width = level.get_width();
-        let depth = level.get_depth();
+        let width = level.width();
+        let depth = level.depth();
         for x in 0..width {
             for y in 0..depth {
-                let z = level.get_z(x, y);
+                let z = level.z(x, y);
                 let mut sum_a = z;
                 let mut div_a = 1.0;
                 let mut sum_b = z;
@@ -201,49 +212,49 @@ impl<FT:Clone+Default,
                 // Each vertex's height is averaged to all adjacent tiles that
                 // a) exist b) have no wall between this tile and them
                 if x > 0 && level.is_move_possible((x, y), (x - 1, y)) {
-                    let z = level.get_z(x - 1, y);
+                    let z = level.z(x - 1, y);
                     sum_a += z;
                     div_a += 1.0;
                     sum_c += z;
                     div_c += 1.0;
                     if y > 0 && level.is_move_possible((x, y), (x - 1, y - 1)) {
-                        let z = level.get_z(x -1, y - 1);
+                        let z = level.z(x -1, y - 1);
                         sum_a += z;
                         div_a += 1.0;
                     }
                 }
                 if y > 0 && level.is_move_possible((x, y), (x, y - 1)) {
-                    let z = level.get_z(x, y - 1);
+                    let z = level.z(x, y - 1);
                     sum_a += z;
                     div_a += 1.0;
                     sum_b += z;
                     div_b += 1.0;
                     if x < width - 1 && level.is_move_possible((x, y), (x + 1, y - 1)) {
-                        let z = level.get_z(x + 1, y - 1);
+                        let z = level.z(x + 1, y - 1);
                         sum_b += z;
                         div_b += 1.0;
                     }
                 }
                 if x < width - 1 && level.is_move_possible((x, y), (x + 1, y)) {
-                    let z = level.get_z(x + 1, y);
+                    let z = level.z(x + 1, y);
                     sum_b += z;
                     div_b += 1.0;
                     sum_d += z;
                     div_d += 1.0;
                     if y < depth - 1 && level.is_move_possible((x, y), (x + 1, y + 1)) {
-                        let z = level.get_z(x + 1, y + 1);
+                        let z = level.z(x + 1, y + 1);
                         sum_d += z;
                         div_d += 1.0;
                     }
                 }
                 if y < depth - 1 && level.is_move_possible((x, y), (x, y + 1)) {
-                    let z = level.get_z(x, y + 1);
+                    let z = level.z(x, y + 1);
                     sum_c += z;
                     div_c += 1.0;
                     sum_d += z;
                     div_d += 1.0;
                     if x > 0 && level.is_move_possible((x, y), (x - 1, y + 1)) {
-                        let z = level.get_z(x - 1, y + 1);
+                        let z = level.z(x - 1, y + 1);
                         sum_c += z;
                         div_c += 1.0;
                     }
@@ -296,33 +307,17 @@ impl<FT:Clone+Default,
     }
 
     /// Render the level content to a Glium display
-    pub fn render(&self, display: &Display, t: f32) {
-        let right = 20.0;
-        let left = -20.0;
-        let top = 2.0;
-        let bottom = 0.0;
-        let far = 10.0;
-        let near = 0.0;
+    pub fn render(&self, display: &Display, camera: &Camera) {
+        let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
-        let (w, h) = display.get_framebuffer_dimensions();
-        let aspect_ratio = (w as f32)/(h as f32);
-
+        
         let vertices = self.get_vertices();
         let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
-        let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
         let vertices_w = self.get_vertices_walls();
         let vertex_buffer_w =  glium::VertexBuffer::new(display, &vertices_w).unwrap();
-        let indices_w = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
-        let v3 = 3.0f32.sqrt();
 
-        let pos = [5.0, t, 0.0];
-        let y_ratio = 5.0;
-        let x_ratio = y_ratio;
-        let z_ratio = 0.5 * y_ratio;
-
-        use std::io::Cursor;
         let image = image::load(Cursor::new(&include_bytes!("../assets/floor_1.png")[..]),
                                 image::PNG).unwrap().to_rgba();
         let image_dimensions = image.dimensions();
@@ -336,33 +331,8 @@ impl<FT:Clone+Default,
 
         
         let uniforms = uniform! {
-            perspective: [
-//                [v3 / v6, 1.0/v6, v2/v6, 0.0],
-//                [0.0, 2.0/v6, -v2/v6, 0.0],
-//                [-v3 / v6, 1.0/v6, v2/v6, 0.0],
-                //                [0.0, 0.0, 0.0, 1.0f32]
-                [v3 / ( 2.0 * aspect_ratio), 0.5, 0.5/(x_ratio + y_ratio + z_ratio), 0.0],
-                [-v3 / (2.0 * aspect_ratio), 0.5, 0.5/(x_ratio + y_ratio + z_ratio), 0.0],
-                [0.0, 1.0, -1.0/(x_ratio + y_ratio + z_ratio), 0.0],
-                [0.0, 0.0, 0.0, 1.0f32]
-                //[0.5, -0.5, 0.0, 0.0],
-                //[v3/2.0, v3/2.0, 1.0, 0.0],
-                //[1.0, 1.0, 1.0, 0.0],
-                //[0.0, 0.0, 0.0, 1.0f32],
-                    
-            ],
-            // transform: [
-            //     [2.0 / (right - left), 0.0, 0.0, 0.0],
-            //     [0.0, 2.0 / (top - bottom), 0.0, 0.0],
-            //     [0.0, 0.0, -2.0 / (far - near), 0.0],
-            //     [- (right + left) / (right - left), - (top + bottom) / (top - bottom), - (far + near) / (far - near), 1.0f32]
-            // ]
-            view: [
-                [1.0/x_ratio, 0.0, 0.0, 0.0],
-                [0.0, 1.0/y_ratio, 0.0, 0.0],
-                [0.0, 0.0, 1.0/z_ratio, 0.0],
-                [-pos[0]/x_ratio, -pos[1]/y_ratio, -pos[2]/z_ratio, 1.0f32]
-            ],
+            perspective: camera.perspective(),
+            view: camera.view(),
             tex: &floor_texture,
             v_light: [1.0, 0.0, 0.0f32],
             light_color: [1.0, 1.0, 1.0f32],
@@ -371,85 +341,6 @@ impl<FT:Clone+Default,
         };
 
 
-        let program =
-            program!(display,
-                     140 => {
-                         vertex: "
-#version 140
-in vec3 position;
-out vec2 v_tex_coords;
-
-uniform mat4 perspective;
-uniform mat4 view;
-in vec2 tex_coords;
-in vec3 normal;
-out vec3 v_normal;
-
-void main() {
-    v_tex_coords = tex_coords;
-    v_normal = normal;
-    gl_Position = perspective * view * vec4(position, 1.0);
-}
-",
-                         fragment: "
-#version 140
-out vec4 color;
-in vec2 v_tex_coords;
-in vec3 v_normal;
-
-uniform sampler2D tex;
-uniform vec3 v_light;
-uniform vec3 light_color;
-uniform vec3 dark_color;
-
-void main() {
-    float brightness = dot(normalize(v_normal), normalize(v_light));
-    vec4 ratio = vec4(mix(dark_color, light_color, brightness), 1.0);
-    color = ratio * texture(tex, v_tex_coords);
-}
-",
-                     }).unwrap();
-
-        let program_w =
-            program!(display,
-                     140 => {
-                         vertex: "
-#version 140
-in vec3 position;
-out vec2 v_tex_coords;
-
-uniform mat4 perspective;
-uniform mat4 view;
-in vec2 tex_coords;
-in vec3 normal;
-out vec3 v_normal;
-
-void main() {
-    v_tex_coords = tex_coords;
-    v_normal = normal;
-    gl_Position = perspective * view * vec4(position, 1.0);
-}
-",
-                         fragment: "
-#version 140
-out vec4 color;
-in vec2 v_tex_coords;
-in vec3 v_normal;
-
-uniform sampler2D wood_tex;
-uniform vec3 v_light;
-uniform vec3 light_color;
-uniform vec3 dark_color;
-
-void main() {
-    float brightness = dot(normalize(v_normal), normalize(v_light));
-    vec4 ratio = vec4(mix(dark_color, light_color, brightness), 1.0);
-    color = ratio * texture(wood_tex, v_tex_coords);
-}
-",
-                     }).unwrap();
-        
-                         
         let params = glium::DrawParameters {
             depth: glium::Depth {
                 test: glium::DepthTest::IfLess,
@@ -460,50 +351,62 @@ void main() {
         };
         let mut frame = display.draw();
         frame.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
-        frame.draw(&vertex_buffer, &indices, &program, &uniforms, &params).unwrap();
-        frame.draw(&vertex_buffer_w, &indices_w, &program_w, &uniforms, &params).unwrap();
+        frame.draw(&vertex_buffer, &indices, &self.program,
+                   &uniform! {
+                       perspective: camera.perspective(),
+                       view: camera.view(),
+                       tex: &floor_texture,
+                       v_light: [1.0, 0.0, 0.0f32],
+                       light_color: [1.0, 1.0, 1.0f32],
+                       dark_color: [0.75, 0.75, 1.0f32],
+                   },
+                   &params).unwrap();
+        frame.draw(&vertex_buffer_w, &indices, &self.program,
+                   &uniform! {
+                       perspective: camera.perspective(),
+                       view: camera.view(),
+                       tex: &wall_texture,
+                       v_light: [1.0, 0.0, 0.0f32],
+                       light_color: [1.0, 1.0, 1.0f32],
+                       dark_color: [0.75, 0.75, 1.0f32],
+                   },
+                   &params).unwrap();
 
-        let vertices = vec![
-            Vertex{
-                position: [2.0 -0.5, 2.5, 0.0],
-                normal: [-1.0, -1.0, 0.0],
-                tex_coords: [0.0, 0.0]
-            },
-            Vertex{
-                position: [2.5, 2.0 - 0.5, 0.0],
-                normal: [-1.0, -1.0, 0.0],
-                tex_coords: [0.0, 1.0]
-            },
-            Vertex{
-                position: [1.5, 2.5, 1.0],
-                normal: [-1.0, -1.0, 0.0],
-                tex_coords: [1.0, 0.0]
-            },
-            Vertex{
-                position: [2.5, 1.5, 0.0],
-                normal: [-1.0, -1.0, 0.0],
-                tex_coords: [0.0, 1.0]
-            },
-            Vertex{
-                position: [2.5, 1.5, 1.0],
-                normal: [-1.0, -1.0, 0.0],
-                tex_coords: [1.0, 1.0]
-            },
-            Vertex{
-                position: [1.5, 2.5, 1.0],
-                normal: [-1.0, -1.0, 0.0],
-                tex_coords: [1.0, 0.0]
-            },
-            ];
-        let new_vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
-        let new_indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-        frame.draw(&new_vertex_buffer, &new_indices, &program_w, &uniforms, &params).unwrap();
+        // let vertices = vec![
+        //     Vertex{
+        //         position: [2.0 -0.5, 2.5, 0.0],
+        //         normal: [-1.0, -1.0, 0.0],
+        //         tex_coords: [0.0, 0.0]
+        //     },
+        //     Vertex{
+        //         position: [2.5, 2.0 - 0.5, 0.0],
+        //         normal: [-1.0, -1.0, 0.0],
+        //         tex_coords: [0.0, 1.0]
+        //     },
+        //     Vertex{
+        //         position: [1.5, 2.5, 1.0],
+        //         normal: [-1.0, -1.0, 0.0],
+        //         tex_coords: [1.0, 0.0]
+        //     },
+        //     Vertex{
+        //         position: [2.5, 1.5, 0.0],
+        //         normal: [-1.0, -1.0, 0.0],
+        //         tex_coords: [0.0, 1.0]
+        //     },
+        //     Vertex{
+        //         position: [2.5, 1.5, 1.0],
+        //         normal: [-1.0, -1.0, 0.0],
+        //         tex_coords: [1.0, 1.0]
+        //     },
+        //     Vertex{
+        //         position: [1.5, 2.5, 1.0],
+        //         normal: [-1.0, -1.0, 0.0],
+        //         tex_coords: [1.0, 0.0]
+        //     },
+        //     ];
+        // let new_vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
+        // let new_indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList        frame.draw(&new_vertex_buffer, &new_indices, &program_w, &uniforms, &params).unwrap();
         frame.finish().unwrap();
     }
 }
 
-#[test]
-fn new_renderer() {
-    let level: Level = Level::new(100, 100, 10.0);
-    let renderer = Renderer::new(level);
-}
