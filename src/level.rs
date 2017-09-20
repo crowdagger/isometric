@@ -153,22 +153,22 @@ impl<FT:Default+Clone,
     /// Add walls to the border of the levels
     ///
     /// (bottom wall at y = 0, left wall at x = 0, and so on)
-    pub fn add_border_walls(&mut self) {
+    pub fn add_border_walls(&mut self, data: WT) {
         let depth = self.depth;
         let width = self.width;
         for x in 0..self.width {
-            self.set_wall(x, 0, Wall::Bottom, Some(WT::default()));
-            self.set_wall(x, depth - 1, Wall::Top, Some(WT::default()));
+            self.set_wall(x, 0, Wall::Bottom, Some(data.clone()));
+            self.set_wall(x, depth - 1, Wall::Top, Some(data.clone()));
         }
         for y in 0..self.depth {
-            self.set_wall(0, y, Wall::Left, Some(WT::default()));
-            self.set_wall(width - 1, y, Wall::Right, Some(WT::default()));
+            self.set_wall(0, y, Wall::Left, Some(data.clone()));
+            self.set_wall(width - 1, y, Wall::Right, Some(data.clone()));
         }
     }
 
     /// Add walls between two tiles if the height (z) difference between
     /// the two is superior or equal to the given threshold.
-    pub fn add_cliff_walls(&mut self, threshold: f32) {
+    pub fn add_cliff_walls(&mut self, threshold: f32, data: WT) {
         for x in 0..(self.width - 1) {
             for y in 0..(self.depth - 1) {
                 let z = self.z(x, y);
@@ -176,10 +176,10 @@ impl<FT:Default+Clone,
                 let z_top = self.z(x, y + 1);
 
                 if (z - z_top).abs() >= threshold {
-                    self.set_wall(x, y, Wall::Top, Some(WT::default()));
+                    self.set_wall(x, y, Wall::Top, Some(data.clone()));
                 }
                 if (z - z_right).abs() >= threshold {
-                    self.set_wall(x, y, Wall::Right, Some(WT::default()));
+                    self.set_wall(x, y, Wall::Right, Some(data.clone()));
                 }
             }
         }
@@ -434,7 +434,7 @@ fn invalid_y() {
 #[test]
 fn border_walls() {
     let mut level: Level = Level::new(20, 20, 0.0);
-    level.add_border_walls();
+    level.add_border_walls(());
     assert!(level.wall(4, 0, Wall::Bottom).is_some());
     assert!(level.wall(6, 19, Wall::Top).is_some());
     assert!(level.wall(0, 12, Wall::Left).is_some());
@@ -477,7 +477,7 @@ fn moves() {
 fn test_cliffs() {
     let mut level: Level = Level::new(10, 10, 0.0);
     level.set_z(1, 1, 10.0);
-    level.add_cliff_walls(1.0);
+    level.add_cliff_walls(1.0, ());
 
     // Move ok 
    assert_eq!(level.is_move_possible((0, 0), (1, 0)), true);
