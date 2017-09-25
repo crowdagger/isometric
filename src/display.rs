@@ -13,6 +13,7 @@
 use level::Level;
 use camera::Camera;
 use wall::WallPosition;
+use wall::Wall;
 
 use glium;
 use glium::Surface;
@@ -42,7 +43,7 @@ pub struct Renderer<'a, FT=(), WT=()> {
 
 impl<'a,
      FT:Clone+Default,
-     WT:Clone+Default> Renderer<'a, FT, WT> {
+     WT:Wall> Renderer<'a, FT, WT> {
     /// Creates a new renderer from an existing level and a glutin display
     pub fn new(level: Level<FT, WT>, display: &'a Display) -> Renderer<'a, FT, WT> {
         Renderer {
@@ -67,8 +68,9 @@ impl<'a,
     }
 
     // Add vertical wall to the vertices
-    fn add_horizontal_wall(&self, vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
-        let other_z = if other_z - z < 1.0 {
+    fn add_horizontal_wall(&self, vertices: &mut Vec<Vertex>, data: &WT,
+                           x: usize, y: usize, z: f32, other_z: f32) {
+        let other_z = if !data.is_cliff() {
             z + 1.0
         } else {
             other_z
@@ -113,8 +115,9 @@ impl<'a,
     }
 
     // Add horizontal wall to the vertices
-    fn add_vertical_wall(&self, vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
-        let other_z = if other_z - z < 1.0 {
+    fn add_vertical_wall(&self, vertices: &mut Vec<Vertex>, data: &WT,
+                         x: usize, y: usize, z: f32, other_z: f32) {
+        let other_z = if !data.is_cliff() {
             z + 1.0
         } else {
             other_z
@@ -168,32 +171,32 @@ impl<'a,
         for x in 0..width {
             for y in 0..depth {
                 let z = level.z(x, y);
-                if level.wall(x, y, WallPosition::Bottom).is_some() {
+                if let &Some(ref data) = level.wall(x, y, WallPosition::Bottom) {
                     if y == 0 {
-                        self.add_horizontal_wall(&mut vertices, x, y, z, z + 1.0);
+                        self.add_horizontal_wall(&mut vertices, data, x, y, z, z + 1.0);
                     } else {
-                        self.add_horizontal_wall(&mut vertices, x, y, z, level.z(x, y - 1));
+                        self.add_horizontal_wall(&mut vertices, data, x, y, z, level.z(x, y - 1));
                     }
                 }
-                if level.wall(x, y, WallPosition::Left).is_some() {
+                if let &Some(ref data) = level.wall(x, y, WallPosition::Left) {
                     if x == 0 {
-                        self.add_vertical_wall(&mut vertices, x, y, z, z + 1.0);
+                        self.add_vertical_wall(&mut vertices, data, x, y, z, z + 1.0);
                     } else {
-                        self.add_vertical_wall(&mut vertices, x, y, z, level.z(x - 1, y));
+                        self.add_vertical_wall(&mut vertices, data, x, y, z, level.z(x - 1, y));
                     }
                 }
-                if level.wall(x, y, WallPosition::Top).is_some() {
+                if let &Some(ref data) = level.wall(x, y, WallPosition::Top) {
                     if y == depth - 1 {
-                        self.add_horizontal_wall(&mut vertices, x, y + 1, z, z + 1.0);
+                        self.add_horizontal_wall(&mut vertices, data, x, y + 1, z, z + 1.0);
                     } else {
-                        self.add_horizontal_wall(&mut vertices, x, y + 1, z, level.z(x, y + 1));
+                        self.add_horizontal_wall(&mut vertices, data, x, y + 1, z, level.z(x, y + 1));
                     }
                 }
-                if level.wall(x, y, WallPosition::Right).is_some()  {
+                if let &Some(ref data) = level.wall(x, y, WallPosition::Right)  {
                     if x == width - 1 {
-                        self.add_vertical_wall(&mut vertices, x + 1, y, z, z + 1.0);
+                        self.add_vertical_wall(&mut vertices, data, x + 1, y, z, z + 1.0);
                     } else {
-                        self.add_vertical_wall(&mut vertices, x + 1, y, z, level.z(x + 1, y));
+                        self.add_vertical_wall(&mut vertices, data, x + 1, y, z, level.z(x + 1, y));
                     }
                 }
             }

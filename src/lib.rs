@@ -21,5 +21,7 @@ mod camera;
 
 pub use level::Level;
 pub use wall::WallPosition;
+pub use wall::Wall;
+pub use wall::SimpleWall;
 pub use display::Renderer;
 pub use camera::Camera;

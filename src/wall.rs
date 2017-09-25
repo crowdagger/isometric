@@ -10,6 +10,8 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 // dual licensed as above, without any additional terms or conditions.
 
+use std::default::Default;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 /// Represents the position of a wall
 pub enum WallPosition {
@@ -21,4 +23,43 @@ pub enum WallPosition {
     Top,
     /// Wall is at the bottom (wall with tile: (x, y - 1))
     Bottom,
+}
+
+
+/// Trait that must be implemented by Wall data.
+///
+/// These functions are implemented for `()`, but not in a useful manner, obviously.
+pub trait Wall: Default + Clone {
+    /// Should return true if the wall is a cliff wall
+    fn is_cliff(&self) -> bool;
+}
+
+impl Wall for () {
+    fn is_cliff(&self) -> bool {
+        return false;
+    }
+}
+
+/// A very simple implementation of wall
+#[derive(Debug, Copy, Clone)]
+pub enum SimpleWall {
+    /// Cliff wall, where there isn't really a wall, more of a slope
+    Cliff,
+    /// Normal wall
+    Normal,
+}
+
+impl Wall for SimpleWall {
+    fn is_cliff(&self) -> bool {
+        match *self {
+            SimpleWall::Cliff => true,
+            SimpleWall::Normal => false,
+        }
+    }
+}
+
+impl Default for SimpleWall {
+    fn default() -> Self {
+        SimpleWall::Normal
+    }
 }

@@ -5,30 +5,30 @@ use isometric::Level;
 use isometric::WallPosition;
 use isometric::Renderer;
 use isometric::Camera;
+use isometric::SimpleWall;
 
 use glium::glutin::{Event, WindowEvent, DeviceEvent};
 
 fn main() {
-    let mut level: Level = Level::new(20, 20, 0.0);
-    level.set_wall(2, 2, WallPosition::Top, Some(()));
-    level.set_wall(2, 2, WallPosition::Bottom, Some(()));
-    level.set_wall(2, 2, WallPosition::Left, Some(()));
-    level.set_wall(2, 2, WallPosition::Right, Some(()));
-    level.set_wall(2, 2, WallPosition::Top, Some(()));
+    let mut level: Level<(), SimpleWall> = Level::new(20, 20, 0.0);
+    level.set_wall(2, 2, WallPosition::Top, Some(SimpleWall::Normal));
+    level.set_wall(2, 2, WallPosition::Bottom, Some((SimpleWall::default())));
+    level.set_wall(2, 2, WallPosition::Left, Some((SimpleWall::Normal)));
+    level.set_wall(2, 2, WallPosition::Right, Some((SimpleWall::Normal)));
 //a    level.set_wall(2, 2, WallPosition::Bottom, Some(()));
 //   level.set_z(2,2, 0.5);
 //    level.set_z(3, 2, 1.0);
 //    level.set_z(3, 3, 1.5);
 //    level.set_z(3, 4, 2.0);
-//    level.set_z(4, 4, 2.0);
-//    level.set_z(3, 5, 2.0);
-//    level.set_z(4, 5, 2.0);
+    level.set_z(4, 4, 2.0);
+    level.set_z(3, 5, 2.0);
+    level.set_z(4, 5, 2.0);
 //    level.set_wall(7, 1, WallPosition::Top, Some(()));
 //    level.set_wall(7, 1, WallPosition::Left, Some(()));
 //    level.set_wall(7, 2, WallPosition::Left, Some(()));
 //    level.set_wall(8, 1, WallPosition::Top, Some(()));
-    level.add_border_walls(());
-//    level.add_cliff_walls(0.25, ());
+    level.add_border_walls(SimpleWall::Normal);
+    level.add_cliff_walls(0.25, SimpleWall::Cliff);
 
     println!("{}", level.to_ascii((0, 0), 5));
 
