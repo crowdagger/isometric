@@ -30,9 +30,10 @@ struct Vertex {
     position: [f32; 3],
     tex_coords: [f32; 2],
     normal: [f32; 3],
+    lighted: f32,
 }
 
-implement_vertex!(Vertex, position, tex_coords, normal);
+implement_vertex!(Vertex, position, tex_coords, normal, lighted);
 
 /// Contains a level and add methods to render it
 pub struct Renderer<'a, FT=(), WT=()> {
@@ -69,12 +70,18 @@ impl<'a,
 
     // Add vertical wall to the vertices
     fn add_horizontal_wall(&self, vertices: &mut Vec<Vertex>, data: &WT,
+                           f: &Fn(usize, usize) -> f32,
                            x: usize, y: usize, z: f32, other_z: f32) {
         let other_z = if !data.is_cliff() {
             z + 1.0
         } else {
             other_z
         };
+        let lighted = {
+            let y = if y > 0 { y - 1 } else { y };
+            f(x, y)
+        };
+        println!("light for ({}, {}) is {}", x, y, lighted);
         let x = x as f32;
         let y = y as f32;
         let a = [x, y, z];
@@ -85,42 +92,53 @@ impl<'a,
         vertices.push(Vertex {
             position: a,
             tex_coords: [0.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted
         });
         vertices.push(Vertex {
             position: d,
             tex_coords: [1.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted
         });
     }
 
     // Add horizontal wall to the vertices
     fn add_vertical_wall(&self, vertices: &mut Vec<Vertex>, data: &WT,
+                         f: &Fn(usize, usize) -> f32,
                          x: usize, y: usize, z: f32, other_z: f32) {
         let other_z = if !data.is_cliff() {
             z + 1.0
         } else {
             other_z
+        };
+        let lighted = {
+            let x = if x > 0 { x - 1 } else { x };
+            f(x, y)
         };
         let x = x as f32;
         let y = y as f32;
@@ -132,37 +150,43 @@ impl<'a,
         vertices.push(Vertex {
             position: a,
             tex_coords: [0.0, 0.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted,
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted,
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted,
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted,
         });
         vertices.push(Vertex {
             position: d,
             tex_coords: [1.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted,
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
-            normal: normal
+            normal: normal,
+            lighted: lighted,
         });
     }
     
     /// Return the vertices corresponding to the walls' data
-    fn get_vertices_walls(&self) -> Vec<Vertex> {
+    fn get_vertices_walls(&self, f: &Fn(usize, usize) -> f32) -> Vec<Vertex> {
         let mut vertices = vec!();
         let level = self.level();
         let width = level.width();
@@ -173,30 +197,30 @@ impl<'a,
                 let z = level.z(x, y);
                 if let &Some(ref data) = level.wall(x, y, WallPosition::Bottom) {
                     if y == 0 {
-                        self.add_horizontal_wall(&mut vertices, data, x, y, z, z + 1.0);
+                        self.add_horizontal_wall(&mut vertices, data, f, x, y, z, z + 1.0);
                     } else {
-                        self.add_horizontal_wall(&mut vertices, data, x, y, z, level.z(x, y - 1));
+                        self.add_horizontal_wall(&mut vertices, data, f, x, y, z, level.z(x, y - 1));
                     }
                 }
                 if let &Some(ref data) = level.wall(x, y, WallPosition::Left) {
                     if x == 0 {
-                        self.add_vertical_wall(&mut vertices, data, x, y, z, z + 1.0);
+                        self.add_vertical_wall(&mut vertices, data, f, x, y, z, z + 1.0);
                     } else {
-                        self.add_vertical_wall(&mut vertices, data, x, y, z, level.z(x - 1, y));
+                        self.add_vertical_wall(&mut vertices, data, f, x, y, z, level.z(x - 1, y));
                     }
                 }
                 if let &Some(ref data) = level.wall(x, y, WallPosition::Top) {
                     if y == depth - 1 {
-                        self.add_horizontal_wall(&mut vertices, data, x, y + 1, z, z + 1.0);
+                        self.add_horizontal_wall(&mut vertices, data, f, x, y + 1, z, z + 1.0);
                     } else {
-                        self.add_horizontal_wall(&mut vertices, data, x, y + 1, z, level.z(x, y + 1));
+                        self.add_horizontal_wall(&mut vertices, data, f, x, y + 1, z, level.z(x, y + 1));
                     }
                 }
                 if let &Some(ref data) = level.wall(x, y, WallPosition::Right)  {
                     if x == width - 1 {
-                        self.add_vertical_wall(&mut vertices, data, x + 1, y, z, z + 1.0);
+                        self.add_vertical_wall(&mut vertices, data, f, x + 1, y, z, z + 1.0);
                     } else {
-                        self.add_vertical_wall(&mut vertices, data, x + 1, y, z, level.z(x + 1, y));
+                        self.add_vertical_wall(&mut vertices, data, f, x + 1, y, z, level.z(x + 1, y));
                     }
                 }
             }
@@ -205,7 +229,7 @@ impl<'a,
     }
     
     /// Returns the vertices corresponding to the level's data
-    fn get_vertices(&self) -> Vec<Vertex> {
+    fn get_vertices(&self, f: &Fn(usize, usize) -> f32) -> Vec<Vertex> {
         let mut vertices = vec!();
         let level = self.level();
         let width = level.width();
@@ -282,36 +306,43 @@ impl<'a,
                 let tc = [0.0 + c[0] / (width as f32 + 1.0), 0.0 + c[1] / (width as f32 + 1.0)];
                 let d = [(x + 1) as f32, (y + 1) as f32, sum_d / div_d];
                 let td = [0.0 + d[0] / (width as f32 + 1.0), 0.0 + d[1] / (width as f32 + 1.0)];
+                let lighted = f(x, y);
                 let normal = [0.0, 0.0, 1.0];
                 vertices.push(Vertex {
                     position: a,
                     tex_coords: ta,
-                    normal: normal
+                    normal: normal,
+                    lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: b,
                     tex_coords: tb,
-                    normal: normal
+                    normal: normal,
+                    lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: c,
                     tex_coords: tc,
-                    normal: normal
+                    normal: normal,
+                    lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: b,
                     tex_coords: tb,
-                    normal: normal
+                    normal: normal,
+                    lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: d,
                     tex_coords: td,
-                    normal: normal
+                    normal: normal,
+                    lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: c,
                     tex_coords: tc,
-                    normal: normal
+                    normal: normal,
+                    lighted: lighted
                 });
                 
             }
@@ -321,13 +352,25 @@ impl<'a,
 
     /// Render the level content to a Glium display
     pub fn render(&self, display: &Display, camera: &Camera) {
+        let pos = camera.pos();
+        let visible = self.level.visibility((pos[0] as usize, pos[1] as usize), 5);
+        let f = |x, y| {
+            if visible(x, y) {
+                let x = x as f32;
+                let y = y as f32;
+                1.0/(1.0 + (((x-pos[0])*(x-pos[0]) + (y - pos[1]) * (y - pos[1])) ) / 25.0)
+            } else {
+                0.0
+            }
+        };
+        
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
         
-        let vertices = self.get_vertices();
+        let vertices = self.get_vertices(&f);
         let vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
 
-        let vertices_w = self.get_vertices_walls();
+        let vertices_w = self.get_vertices_walls(&f);
         let vertex_buffer_w =  glium::VertexBuffer::new(display, &vertices_w).unwrap();
 
 
@@ -349,7 +392,7 @@ impl<'a,
             tex: &floor_texture,
             v_light: [1.0, 0.0, 0.0f32],
             light_color: [1.0, 1.0, 1.0f32],
-            dark_color: [0.75, 0.75, 1.0f32],
+            dark_color: [0.25, 0.25, 0.5f32],
             wood_tex: &wall_texture,
         };
 

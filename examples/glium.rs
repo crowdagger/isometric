@@ -27,7 +27,7 @@ fn main() {
 //    level.set_wall(7, 1, WallPosition::Left, Some(()));
 //    level.set_wall(7, 2, WallPosition::Left, Some(()));
 //    level.set_wall(8, 1, WallPosition::Top, Some(()));
-    level.add_border_walls(SimpleWall::Normal);
+//    level.add_border_walls(SimpleWall::Normal);
     level.add_cliff_walls(0.25, SimpleWall::Cliff);
 
     println!("{}", level.to_ascii((0, 0), 5));
@@ -45,7 +45,6 @@ fn main() {
     let mut renderer = Renderer::new(level, &display);
 
     let mut closed = false;
-    let mut t = -5.0;
     
     while !closed {
         events_loop.poll_events(|ev| {
