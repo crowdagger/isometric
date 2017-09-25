@@ -307,41 +307,60 @@ impl<'a,
                 let d = [(x + 1) as f32, (y + 1) as f32, sum_d / div_d];
                 let td = [0.0 + d[0] / (width as f32 + 1.0), 0.0 + d[1] / (width as f32 + 1.0)];
                 let lighted = f(x, y);
-                let normal = [0.0, 0.0, 1.0];
+                // I probably should explain this computation as I won't remember it
+                //
+                // so the normal is (x, y z). We want z to be 1 (positive) so (x, y, 1).
+                // we also know that normal · ab and normal · bc must be equal to zero.
+                // ab is equat to (1, 0, zb - za) so x = zb - za
+                // ac is equal to (0, 1, zc - za) so y = za - zc
+                //
+                // for the second one it's bd, dc
+                // so bd = (0, 1, zd - zb) so y = zb - zd
+                // dc = (-1, 0, zc -zd) so x = zc - zd
+                let mut normal_1 = [a[2]-b[2], a[2]-c[2], 1.0];
+                let norm = (normal_1[0]*normal_1[0] + normal_1[1]*normal_1[1] + normal_1[2] * normal_1[2]).sqrt();
+                normal_1[0] /= norm;
+                normal_1[1] /= norm;
+                normal_1[2] /= norm;
+                let mut normal_2 = [c[2]-d[2], b[2]-d[2], 1.0];
+                let norm = (normal_2[0]*normal_2[0] + normal_2[1]*normal_2[1] + normal_2[2] * normal_2[2]).sqrt();
+                normal_1[0] /= norm;
+                normal_1[1] /= norm;
+                normal_1[2] /= norm;
                 vertices.push(Vertex {
                     position: a,
                     tex_coords: ta,
-                    normal: normal,
+                    normal: normal_1,
                     lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: b,
                     tex_coords: tb,
-                    normal: normal,
+                    normal: normal_1,
                     lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: c,
                     tex_coords: tc,
-                    normal: normal,
+                    normal: normal_1,
                     lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: b,
                     tex_coords: tb,
-                    normal: normal,
+                    normal: normal_2,
                     lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: d,
                     tex_coords: td,
-                    normal: normal,
+                    normal: normal_2,
                     lighted: lighted
                 });
                 vertices.push(Vertex {
                     position: c,
                     tex_coords: tc,
-                    normal: normal,
+                    normal: normal_2,
                     lighted: lighted
                 });
                 
@@ -354,15 +373,16 @@ impl<'a,
     pub fn render(&self, display: &Display, camera: &Camera) {
         let pos = camera.pos();
         let visible = self.level.visibility((pos[0] as usize, pos[1] as usize), 5);
-        let f = |x, y| {
-            if visible(x, y) {
-                let x = x as f32;
-                let y = y as f32;
-                1.0/(1.0 + (((x-pos[0])*(x-pos[0]) + (y - pos[1]) * (y - pos[1])) ) / 25.0)
-            } else {
-                0.0
-            }
-        };
+        let f = |x, y| 1.0;
+        // let f = |x, y| {
+        //     if visible(x, y) {
+        //         let x = x as f32;
+        //         let y = y as f32;
+        //         1.0/(1.0 + (((x-pos[0])*(x-pos[0]) + (y - pos[1]) * (y - pos[1])) ) / 25.0)
+        //     } else {
+        //         0.0
+        //     }
+        // };
         
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
