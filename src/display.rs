@@ -12,7 +12,7 @@
 
 use level::Level;
 use camera::Camera;
-use wall::Wall;
+use wall::WallPosition;
 
 use glium;
 use glium::Surface;
@@ -68,6 +68,11 @@ impl<'a,
 
     // Add vertical wall to the vertices
     fn add_horizontal_wall(&self, vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
+        let other_z = if other_z - z < 1.0 {
+            z + 1.0
+        } else {
+            other_z
+        };
         let x = x as f32;
         let y = y as f32;
         let a = [x, y, z];
@@ -109,44 +114,49 @@ impl<'a,
 
     // Add horizontal wall to the vertices
     fn add_vertical_wall(&self, vertices: &mut Vec<Vertex>, x: usize, y: usize, z: f32, other_z: f32) {
-            let x = x as f32;
-            let y = y as f32;
-            let a = [x, y, z];
-            let b = [x, y + 1.0, z];
-            let c = [x, y, other_z];
-            let d = [x, y + 1.0, other_z];
-            let normal = [-1.0, 0.0, 0.0];
-            vertices.push(Vertex {
-                position: a,
-                tex_coords: [0.0, 0.0],
-                normal: normal
-            });
-            vertices.push(Vertex {
-                position: b,
-                tex_coords: [1.0, 0.0],
-                normal: normal
-            });
-            vertices.push(Vertex {
-                position: c,
-                tex_coords: [0.0, 1.0],
-                normal: normal
-            });
-            vertices.push(Vertex {
-                position: b,
-                tex_coords: [1.0, 0.0],
-                normal: normal
-            });
-            vertices.push(Vertex {
-                position: d,
-                tex_coords: [1.0, 1.0],
-                normal: normal
-             });
-            vertices.push(Vertex {
-                position: c,
-                tex_coords: [0.0, 1.0],
-                normal: normal
-            });
-        }
+        let other_z = if other_z - z < 1.0 {
+            z + 1.0
+        } else {
+            other_z
+        };
+        let x = x as f32;
+        let y = y as f32;
+        let a = [x, y, z];
+        let b = [x, y + 1.0, z];
+        let c = [x, y, other_z];
+        let d = [x, y + 1.0, other_z];
+        let normal = [-1.0, 0.0, 0.0];
+        vertices.push(Vertex {
+            position: a,
+            tex_coords: [0.0, 0.0],
+            normal: normal
+        });
+        vertices.push(Vertex {
+            position: b,
+            tex_coords: [1.0, 0.0],
+            normal: normal
+        });
+        vertices.push(Vertex {
+            position: c,
+            tex_coords: [0.0, 1.0],
+            normal: normal
+        });
+        vertices.push(Vertex {
+            position: b,
+            tex_coords: [1.0, 0.0],
+            normal: normal
+        });
+        vertices.push(Vertex {
+            position: d,
+            tex_coords: [1.0, 1.0],
+            normal: normal
+        });
+        vertices.push(Vertex {
+            position: c,
+            tex_coords: [0.0, 1.0],
+            normal: normal
+        });
+    }
     
     /// Return the vertices corresponding to the walls' data
     fn get_vertices_walls(&self) -> Vec<Vertex> {
@@ -158,28 +168,28 @@ impl<'a,
         for x in 0..width {
             for y in 0..depth {
                 let z = level.z(x, y);
-                if level.wall(x, y, Wall::Bottom).is_some() {
+                if level.wall(x, y, WallPosition::Bottom).is_some() {
                     if y == 0 {
                         self.add_horizontal_wall(&mut vertices, x, y, z, z + 1.0);
                     } else {
                         self.add_horizontal_wall(&mut vertices, x, y, z, level.z(x, y - 1));
                     }
                 }
-                if level.wall(x, y, Wall::Left).is_some() {
+                if level.wall(x, y, WallPosition::Left).is_some() {
                     if x == 0 {
                         self.add_vertical_wall(&mut vertices, x, y, z, z + 1.0);
                     } else {
                         self.add_vertical_wall(&mut vertices, x, y, z, level.z(x - 1, y));
                     }
                 }
-                if level.wall(x, y, Wall::Top).is_some() {
+                if level.wall(x, y, WallPosition::Top).is_some() {
                     if y == depth - 1 {
                         self.add_horizontal_wall(&mut vertices, x, y + 1, z, z + 1.0);
                     } else {
                         self.add_horizontal_wall(&mut vertices, x, y + 1, z, level.z(x, y + 1));
                     }
                 }
-                if level.wall(x, y, Wall::Right).is_some()  {
+                if level.wall(x, y, WallPosition::Right).is_some()  {
                     if x == width - 1 {
                         self.add_vertical_wall(&mut vertices, x + 1, y, z, z + 1.0);
                     } else {

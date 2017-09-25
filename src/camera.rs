@@ -32,7 +32,7 @@ impl Camera {
             aspect_ratio: aspect_ratio,
             pos: [0.0; 3],
             y_ratio: 5.0,
-            z_ratio: 2.5,
+            z_ratio: 5.0,
             
         }
     }

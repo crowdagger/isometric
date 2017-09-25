@@ -10,7 +10,7 @@
 // for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 // dual licensed as above, without any additional terms or conditions.
 
-use wall::Wall;
+use wall::WallPosition;
 
 use std::default::Default;
 use std::f32;
@@ -45,7 +45,7 @@ impl<FT:Default+Clone,
     /// # Example
     ///
     /// ```
-    /// use isometric::{Level, Wall};
+    /// use isometric::{Level, WallPosition};
     ///
     /// // Type annotation is necessary to use default parametric types (())
     /// let mut level: Level = Level::new(10, 10, 0.0);
@@ -54,7 +54,7 @@ impl<FT:Default+Clone,
     /// assert_eq!(level.is_move_possible((0, 2), (0, 3)), true);
     ///
     /// // Add a wall between (0, 2) and (0, 3)
-    /// level.set_wall(0, 2, Wall::Top, Some(()));
+    /// level.set_wall(0, 2, WallPosition::Top, Some(()));
     ///
     /// // Move between (0, 2) and (0, 3) is no longer possible
     /// assert_eq!(level.is_move_possible((0, 2), (0, 3)), false);
@@ -125,28 +125,28 @@ impl<FT:Default+Clone,
     /// # Example
     ///
     /// ```
-    /// use isometric::{Level, Wall};
+    /// use isometric::{Level, WallPosition};
     /// let level: Level = Level::new(10, 10, 0.0);
-    /// assert!(level.wall(1, 1, Wall::Left).is_none());
+    /// assert!(level.wall(1, 1, WallPosition::Left).is_none());
     /// ```
-    pub fn wall(&self, x: usize, y: usize, wall: Wall) -> &Option<WT> {
+    pub fn wall(&self, x: usize, y: usize, wall: WallPosition) -> &Option<WT> {
         debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds");
         match wall {
-            Wall::Bottom => &self.walls_h[x * (self.depth + 1) + y],
-            Wall::Left => &self.walls_v[y * (self.width + 1) + x],
-            Wall::Right => &self.walls_v[y * (self.width + 1) + x + 1],
-            Wall::Top => &self.walls_h[x * (self.depth + 1) + y + 1],
+            WallPosition::Bottom => &self.walls_h[x * (self.depth + 1) + y],
+            WallPosition::Left => &self.walls_v[y * (self.width + 1) + x],
+            WallPosition::Right => &self.walls_v[y * (self.width + 1) + x + 1],
+            WallPosition::Top => &self.walls_h[x * (self.depth + 1) + y + 1],
         }
     }
 
     /// Sets the wall at tile x, y. To remove the wall, set it to `None`.
-    pub fn set_wall(&mut self, x: usize, y: usize, wall: Wall, data: Option<WT>) {
+    pub fn set_wall(&mut self, x: usize, y: usize, wall: WallPosition, data: Option<WT>) {
         debug_assert!(x < self.width && y < self.depth, "x and y must be in level's bounds; ({}, {}) when bounds are ({}, {})", x, y, self.width, self.depth);
         match wall {
-            Wall::Bottom => self.walls_h[x * (self.depth + 1) + y] = data,
-            Wall::Left => self.walls_v[y * (self.width + 1) + x] = data,
-            Wall::Right => self.walls_v[y * (self.width + 1) + x + 1] = data,
-            Wall::Top => self.walls_h[x * (self.depth + 1) + y + 1] = data,
+            WallPosition::Bottom => self.walls_h[x * (self.depth + 1) + y] = data,
+            WallPosition::Left => self.walls_v[y * (self.width + 1) + x] = data,
+            WallPosition::Right => self.walls_v[y * (self.width + 1) + x + 1] = data,
+            WallPosition::Top => self.walls_h[x * (self.depth + 1) + y + 1] = data,
         }
     }
 
@@ -157,12 +157,12 @@ impl<FT:Default+Clone,
         let depth = self.depth;
         let width = self.width;
         for x in 0..self.width {
-            self.set_wall(x, 0, Wall::Bottom, Some(data.clone()));
-            self.set_wall(x, depth - 1, Wall::Top, Some(data.clone()));
+            self.set_wall(x, 0, WallPosition::Bottom, Some(data.clone()));
+            self.set_wall(x, depth - 1, WallPosition::Top, Some(data.clone()));
         }
         for y in 0..self.depth {
-            self.set_wall(0, y, Wall::Left, Some(data.clone()));
-            self.set_wall(width - 1, y, Wall::Right, Some(data.clone()));
+            self.set_wall(0, y, WallPosition::Left, Some(data.clone()));
+            self.set_wall(width - 1, y, WallPosition::Right, Some(data.clone()));
         }
     }
 
@@ -176,10 +176,10 @@ impl<FT:Default+Clone,
                 let z_top = self.z(x, y + 1);
 
                 if (z - z_top).abs() >= threshold {
-                    self.set_wall(x, y, Wall::Top, Some(data.clone()));
+                    self.set_wall(x, y, WallPosition::Top, Some(data.clone()));
                 }
                 if (z - z_right).abs() >= threshold {
-                    self.set_wall(x, y, Wall::Right, Some(data.clone()));
+                    self.set_wall(x, y, WallPosition::Right, Some(data.clone()));
                 }
             }
         }
@@ -225,10 +225,10 @@ impl<FT:Default+Clone,
                 }
         } else {
             match (dx, dy) {
-                (1, 0) => self.wall(start_pos.0, start_pos.1, Wall::Right).is_none(),
-                (-1, 0) => self.wall(start_pos.0, start_pos.1, Wall::Left).is_none(),
-                (0, 1) => self.wall(start_pos.0, start_pos.1, Wall::Top).is_none(),
-                (0, -1) => self.wall(start_pos.0, start_pos.1, Wall::Bottom).is_none(),
+                (1, 0) => self.wall(start_pos.0, start_pos.1, WallPosition::Right).is_none(),
+                (-1, 0) => self.wall(start_pos.0, start_pos.1, WallPosition::Left).is_none(),
+                (0, 1) => self.wall(start_pos.0, start_pos.1, WallPosition::Top).is_none(),
+                (0, -1) => self.wall(start_pos.0, start_pos.1, WallPosition::Bottom).is_none(),
                 (_, _) => unreachable!(),
             } 
         }
@@ -357,23 +357,23 @@ impl<FT:Default+Clone,
                     res.push_str("###");
                     continue;
                 }
-                if self.wall(x, y, Wall::Left).is_some() {
+                if self.wall(x, y, WallPosition::Left).is_some() {
                     res.push('|'); 
                 } else {
                     res.push(' ');
                 }
-                if self.wall(x, y, Wall::Top).is_some() && self.wall(x, y, Wall::Bottom).is_some() {
+                if self.wall(x, y, WallPosition::Top).is_some() && self.wall(x, y, WallPosition::Bottom).is_some() {
                     res.push('=');
-                } else if self.wall(x, y, Wall::Top).is_some() {
+                } else if self.wall(x, y, WallPosition::Top).is_some() {
                     // reverted because display reverted
                     res.push('_');
-                } else if self.wall(x, y, Wall::Bottom).is_some() {
+                } else if self.wall(x, y, WallPosition::Bottom).is_some() {
                     // reverted because display reverted
                     res.push('-');
                 } else {
                     res.push(' ');
                 }
-                if self.wall(x, y, Wall::Right).is_some() {
+                if self.wall(x, y, WallPosition::Right).is_some() {
                     res.push('|'); 
                 } else {
                     res.push(' ');
@@ -435,11 +435,11 @@ fn invalid_y() {
 fn border_walls() {
     let mut level: Level = Level::new(20, 20, 0.0);
     level.add_border_walls(());
-    assert!(level.wall(4, 0, Wall::Bottom).is_some());
-    assert!(level.wall(6, 19, Wall::Top).is_some());
-    assert!(level.wall(0, 12, Wall::Left).is_some());
-    assert!(level.wall(19, 7, Wall::Right).is_some());
-    assert!(level.wall(2, 2, Wall::Right).is_none());
+    assert!(level.wall(4, 0, WallPosition::Bottom).is_some());
+    assert!(level.wall(6, 19, WallPosition::Top).is_some());
+    assert!(level.wall(0, 12, WallPosition::Left).is_some());
+    assert!(level.wall(19, 7, WallPosition::Right).is_some());
+    assert!(level.wall(2, 2, WallPosition::Right).is_none());
 }
 
 #[test]
@@ -469,7 +469,7 @@ fn moves() {
     assert_eq!(level.is_move_possible((9, 9), (9, 10)), false);
 
     // Add a wall, move no longer possible
-    level.set_wall(0, 0, Wall::Right, Some(()));
+    level.set_wall(0, 0, WallPosition::Right, Some(()));
     assert_eq!(level.is_move_possible((0, 0), (1, 0)), false);
 }
 
@@ -500,8 +500,8 @@ fn floor_data() {
 #[test]
 fn wall_data() {
     let mut level: Level<i32, i32> = Level::new(10, 10, 0.0);
-    level.set_wall(4, 4, Wall::Right, Some(42));
-    assert_eq!(level.wall(4, 4, Wall::Right).unwrap(), 42);
-    assert_eq!(level.wall(5, 4, Wall::Left).unwrap(), 42);
-    assert!(level.wall(0, 0, Wall::Right).is_none());
+    level.set_wall(4, 4, WallPosition::Right, Some(42));
+    assert_eq!(level.wall(4, 4, WallPosition::Right).unwrap(), 42);
+    assert_eq!(level.wall(5, 4, WallPosition::Left).unwrap(), 42);
+    assert!(level.wall(0, 0, WallPosition::Right).is_none());
 }

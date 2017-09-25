@@ -1,14 +1,14 @@
 extern crate isometric;
 
-use isometric::Level;
+use isometric::{Level, WallPosition};
 use std::io;
 
 fn main() {
     let mut level: Level = Level::new(10, 10, 0.0);
-    level.set_z(2, 2, 5.0);
-    level.set_z(2, 3, 5.0);
-    level.set_z(3, 2, 5.0);
-    level.set_z(3, 3, 5.0);
+    level.set_wall(2, 2, WallPosition::Top, Some(()));
+    level.set_wall(2, 2, WallPosition::Bottom, Some(()));
+    level.set_wall(2, 2, WallPosition::Left, Some(()));
+    level.set_wall(2, 2, WallPosition::Right, Some(()));
     level.add_border_walls(());
     level.add_cliff_walls(1.0, ());
     let mut pos = (0, 0);

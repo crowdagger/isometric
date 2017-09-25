@@ -12,7 +12,7 @@
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 /// Represents the position of a wall
-pub enum Wall {
+pub enum WallPosition {
     /// Wall is at the left (wall with tile: (x - 1, y))
     Left,
     /// Wall is at the right (wall with tile: (x + 1, y))
