@@ -12,7 +12,7 @@
 
 use glium::Display;
 
-const V3: f32 = 1.732050807568877293; // sqrt of 3
+pub const V3: f32 = 1.732050807568877293; // sqrt of 3
 
 /// Orthogonal camera.
 #[derive(Debug, Clone)]
@@ -35,6 +35,11 @@ impl Camera {
             z_ratio: 5.0,
             
         }
+    }
+
+    /// Get aspect ratio
+    pub fn aspect_ratio(&self) -> f32 {
+        self.aspect_ratio
     }
 
     /// Retuns an array containing the positions of the camera

@@ -13,6 +13,7 @@
 use level::Level;
 use camera::Camera;
 use wall::WallPosition;
+use camera::V3;
 use wall::Wall;
 
 use glium;
@@ -31,9 +32,10 @@ struct Vertex {
     tex_coords: [f32; 2],
     normal: [f32; 3],
     lighted: f32,
+    final_z: f32,
 }
 
-implement_vertex!(Vertex, position, tex_coords, normal, lighted);
+implement_vertex!(Vertex, position, tex_coords, normal, lighted, final_z);
 
 /// Contains a level and add methods to render it
 pub struct Renderer<'a, FT=(), WT=()> {
@@ -72,16 +74,18 @@ impl<'a,
     fn add_horizontal_wall(&self, vertices: &mut Vec<Vertex>, data: &WT,
                            f: &Fn(usize, usize) -> f32,
                            x: usize, y: usize, z: f32, other_z: f32) {
-        let other_z = if !data.is_cliff() {
-            z + 1.0
-        } else {
+        let other_z = if data.is_cliff() {
             other_z
+        } else if data.is_border() {
+            z - 3.0
+        } else {
+            z + 1.0
         };
+        let final_z = (x + y) as f32 / 2.0 - 0.1;
         let lighted = {
             let y = if y > 0 { y - 1 } else { y };
             f(x, y)
         };
-        println!("light for ({}, {}) is {}", x, y, lighted);
         let x = x as f32;
         let y = y as f32;
         let a = [x, y, z];
@@ -93,37 +97,44 @@ impl<'a,
             position: a,
             tex_coords: [0.0, 1.0],
             normal: normal,
-            lighted: lighted
+            lighted: lighted,
+            final_z: final_z,
+                
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
             normal: normal,
-            lighted: lighted
+            lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
             normal: normal,
-            lighted: lighted
+            lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
             normal: normal,
-            lighted: lighted
+            lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: d,
             tex_coords: [1.0, 1.0],
             normal: normal,
-            lighted: lighted
+            lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
             normal: normal,
-            lighted: lighted
+            lighted: lighted,
+            final_z: final_z,
         });
     }
 
@@ -131,11 +142,14 @@ impl<'a,
     fn add_vertical_wall(&self, vertices: &mut Vec<Vertex>, data: &WT,
                          f: &Fn(usize, usize) -> f32,
                          x: usize, y: usize, z: f32, other_z: f32) {
-        let other_z = if !data.is_cliff() {
-            z + 1.0
-        } else {
+        let other_z = if data.is_cliff() {
             other_z
+        } else if data.is_border() {
+            z - 3.0
+        } else {
+            z + 1.0
         };
+        let final_z = (x + y) as f32 / 2.0 - 0.1;
         let lighted = {
             let x = if x > 0 { x - 1 } else { x };
             f(x, y)
@@ -152,36 +166,42 @@ impl<'a,
             tex_coords: [0.0, 0.0],
             normal: normal,
             lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
             normal: normal,
             lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
             normal: normal,
             lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: b,
             tex_coords: [1.0, 0.0],
             normal: normal,
             lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: d,
             tex_coords: [1.0, 1.0],
             normal: normal,
             lighted: lighted,
+            final_z: final_z,
         });
         vertices.push(Vertex {
             position: c,
             tex_coords: [0.0, 1.0],
             normal: normal,
             lighted: lighted,
+            final_z: final_z,
         });
     }
     
@@ -237,6 +257,7 @@ impl<'a,
         for x in 0..width {
             for y in 0..depth {
                 let z = level.z(x, y);
+                let final_z = (x + y) as f32 / 2.0;
                 let mut sum_a = z;
                 let mut div_a = 1.0;
                 let mut sum_b = z;
@@ -331,37 +352,43 @@ impl<'a,
                     position: a,
                     tex_coords: ta,
                     normal: normal_1,
-                    lighted: lighted
+                    lighted: lighted,
+                    final_z: final_z,
                 });
                 vertices.push(Vertex {
                     position: b,
                     tex_coords: tb,
                     normal: normal_1,
-                    lighted: lighted
+                    lighted: lighted,
+                    final_z: final_z,
                 });
                 vertices.push(Vertex {
                     position: c,
                     tex_coords: tc,
                     normal: normal_1,
-                    lighted: lighted
+                    lighted: lighted,
+                    final_z: final_z,
                 });
                 vertices.push(Vertex {
                     position: b,
                     tex_coords: tb,
                     normal: normal_2,
-                    lighted: lighted
+                    lighted: lighted,
+                    final_z: final_z,
                 });
                 vertices.push(Vertex {
                     position: d,
                     tex_coords: td,
                     normal: normal_2,
-                    lighted: lighted
+                    lighted: lighted,
+                    final_z: final_z,
                 });
                 vertices.push(Vertex {
                     position: c,
                     tex_coords: tc,
                     normal: normal_2,
-                    lighted: lighted
+                    lighted: lighted,
+                    final_z: final_z,
                 });
                 
             }
@@ -373,16 +400,18 @@ impl<'a,
     pub fn render(&self, display: &Display, camera: &Camera) {
         let pos = camera.pos();
         let visible = self.level.visibility((pos[0] as usize, pos[1] as usize), 5);
-        let f = |x, y| 1.0;
-        // let f = |x, y| {
-        //     if visible(x, y) {
-        //         let x = x as f32;
-        //         let y = y as f32;
-        //         1.0/(1.0 + (((x-pos[0])*(x-pos[0]) + (y - pos[1]) * (y - pos[1])) ) / 25.0)
-        //     } else {
-        //         0.0
-        //     }
-        // };
+//        let f = |x, y| 1.0;
+        let f = |x, y| {
+            if visible(x, y) {
+                let x = x as f32;
+                let y = y as f32;
+                let mut dist:f32 = (((x-pos[0])*(x-pos[0]) + (y - pos[1]) * (y - pos[1]))).sqrt();
+                dist = dist / 5.0;
+                1.0/(1.0 + dist) 
+            } else {
+                0.0
+            }
+        };
         
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
@@ -405,28 +434,40 @@ impl<'a,
         let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw()[..], image_dimensions);
         let wall_texture = glium::texture::Texture2d::new(display, image).unwrap();
 
+        let image = image::load(Cursor::new(&include_bytes!("../assets/sprite_1.png")[..]),
+                                        image::PNG).unwrap().to_rgba();
+        let image_dimensions = image.dimensions();
+        let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw()[..], image_dimensions);
+        let sprite_texture = glium::texture::Texture2d::new(display, image).unwrap();
+
+        let image = image::load(Cursor::new(&include_bytes!("../assets/sprite_2.png")[..]),
+                                        image::PNG).unwrap().to_rgba();
+        let image_dimensions = image.dimensions();
+        let image = glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw()[..], image_dimensions);
+        let ghost_texture = glium::texture::Texture2d::new(display, image).unwrap();
+
         
-        let uniforms = uniform! {
-            perspective: camera.perspective(),
-            view: camera.view(),
-            tex: &floor_texture,
-            v_light: [1.0, 0.0, 0.0f32],
-            light_color: [1.0, 1.0, 1.0f32],
-            dark_color: [0.25, 0.25, 0.5f32],
-            wood_tex: &wall_texture,
-        };
-
-
         let params = glium::DrawParameters {
             depth: glium::Depth {
                 test: glium::DepthTest::IfLess,
                 write: true,
                 .. Default::default()
             },
+            blend: glium::Blend::alpha_blending(),
+            .. Default::default()
+        };
+        let params2 = glium::DrawParameters {
+            depth: glium::Depth {
+                test: glium::DepthTest::Overwrite,
+                write: true,
+                .. Default::default()
+            },
+            blend: glium::Blend::alpha_blending(),
             .. Default::default()
         };
         let mut frame = display.draw();
-        frame.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
+        let dark_color = [0.5, 0.5, 0.5f32];
+        frame.clear_color_and_depth((0.1, 0.0, 0.0, 1.0), 1.0);
         frame.draw(&vertex_buffer, &indices, &self.program,
                    &uniform! {
                        perspective: camera.perspective(),
@@ -434,9 +475,93 @@ impl<'a,
                        tex: &floor_texture,
                        v_light: [1.0, 0.0, 0.0f32],
                        light_color: [1.0, 1.0, 1.0f32],
-                       dark_color: [0.75, 0.75, 1.0f32],
+                       dark_color: dark_color,
                    },
                    &params).unwrap();
+
+        let pos = [pos[0] + 3.0, pos[1] + 1.0, pos[2]];
+        let z_bottom = self.level.z(pos[0] as usize, pos[1] as usize);
+        let final_z = (pos[0] + pos[1]) / 2.0 - 0.05;
+        println!("({}, {})", pos[0], pos[1]);
+        let cam = camera.pos();
+        let asp = camera.aspect_ratio();
+        let pos = [pos[0]/5.0 - cam[0]/5.0, pos[1] / 5.0 - cam[1] / 5.0, pos[2]/5.0 - cam[2]/5.0];
+        let z = 0.5/10.0 * pos[0] + 0.5/10.0 * pos[1] - 1.0*z_bottom/10.0 + 0.001;
+        let x = V3/(2.0*asp)  * pos[0] - V3/(2.0*asp) * pos[1];
+        let (xac, xbd) = (x-V3/(10.0*asp), x + V3/(10.0*asp));
+
+        println!("z: {}", z_bottom);
+        let yab = 0.5 * pos[0] + 0.5 * pos[1] + z_bottom/5.0;
+        let ycd = yab + 2.0/5.0;
+        let ygh = yab + 0.5/5.0;
+        let z_top = z_bottom + 2.0;
+        let zc = z - 0.015;
+        let za = z + 0.025;
+        let zg = z + 0.005;
+        let normal = [0.0, 0.0, -1.0];
+
+        let vertices = vec![
+            Vertex{ //a
+                position: [xac, yab, za],
+                normal: normal,
+                tex_coords: [0.0, 0.0],
+                lighted: 1.0,
+                final_z: final_z,
+            },
+            Vertex{ //b
+                position: [xbd, yab, z],
+                normal: normal,
+                tex_coords: [1.0, 0.0],
+                lighted: 1.0,
+                final_z: final_z,
+            },
+            Vertex{ //c
+                position: [xac, ycd, zc],
+                normal: normal,
+                tex_coords: [0.0, 1.0],
+                lighted: 1.0,
+                final_z: final_z,
+            },
+            Vertex{ //b
+                position: [xbd, yab, z],
+                normal: normal,
+                tex_coords: [1.0, 0.0],
+                lighted: 1.0,
+                final_z: final_z,
+            },
+            Vertex{ //d
+                position: [xbd, ycd, z],
+                normal: normal,
+                tex_coords: [1.0, 1.0],
+                lighted: 1.0,
+                final_z: final_z,
+            },
+            Vertex{ //c
+                position: [xac, ycd, zc],
+                normal: normal,
+                tex_coords: [0.0, 1.0],
+                lighted: 1.0,
+                final_z: final_z,
+            },
+        ];
+        let new_vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
+        let mut perspective = camera.perspective();
+        let id = [
+                [1.0f32, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+        ];
+        frame.draw(&new_vertex_buffer, &indices, &self.program, &uniform! {
+            perspective: id,
+            view: id,
+            tex: &sprite_texture,
+            v_light: [1.0, 0.0, 0.0f32],
+            light_color: [1.0, 1.0, 1.0f32],
+            dark_color: dark_color,
+        },&params).unwrap();
+
+//        frame.clear_depth(10000.0);
         frame.draw(&vertex_buffer_w, &indices, &self.program,
                    &uniform! {
                        perspective: camera.perspective(),
@@ -444,45 +569,10 @@ impl<'a,
                        tex: &wall_texture,
                        v_light: [1.0, 0.0, 0.0f32],
                        light_color: [1.0, 1.0, 1.0f32],
-                       dark_color: [0.75, 0.75, 1.0f32],
+                       dark_color: dark_color,
                    },
                    &params).unwrap();
-
-        // let vertices = vec![
-        //     Vertex{
-        //         position: [2.0 -0.5, 2.5, 0.0],
-        //         normal: [-1.0, -1.0, 0.0],
-        //         tex_coords: [0.0, 0.0]
-        //     },
-        //     Vertex{
-        //         position: [2.5, 2.0 - 0.5, 0.0],
-        //         normal: [-1.0, -1.0, 0.0],
-        //         tex_coords: [0.0, 1.0]
-        //     },
-        //     Vertex{
-        //         position: [1.5, 2.5, 1.0],
-        //         normal: [-1.0, -1.0, 0.0],
-        //         tex_coords: [1.0, 0.0]
-        //     },
-        //     Vertex{
-        //         position: [2.5, 1.5, 0.0],
-        //         normal: [-1.0, -1.0, 0.0],
-        //         tex_coords: [0.0, 1.0]
-        //     },
-        //     Vertex{
-        //         position: [2.5, 1.5, 1.0],
-        //         normal: [-1.0, -1.0, 0.0],
-        //         tex_coords: [1.0, 1.0]
-        //     },
-        //     Vertex{
-        //         position: [1.5, 2.5, 1.0],
-        //         normal: [-1.0, -1.0, 0.0],
-        //         tex_coords: [1.0, 0.0]
-        //     },
-        //     ];
-        // let new_vertex_buffer = glium::VertexBuffer::new(display, &vertices).unwrap();
-        // let new_indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList        frame.draw(&new_vertex_buffer, &new_indices, &program_w, &uniforms, &params).unwrap();
-        frame.finish().unwrap();
+        frame.finish();
     }
 }
 

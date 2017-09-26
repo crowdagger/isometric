@@ -32,10 +32,16 @@ pub enum WallPosition {
 pub trait Wall: Default + Clone {
     /// Should return true if the wall is a cliff wall
     fn is_cliff(&self) -> bool;
+    /// Should return true if the wall is a border wall
+    fn is_border(&self) -> bool;
 }
 
 impl Wall for () {
     fn is_cliff(&self) -> bool {
+        return false;
+    }
+
+    fn is_border(&self) -> bool {
         return false;
     }
 }
@@ -47,13 +53,22 @@ pub enum SimpleWall {
     Cliff,
     /// Normal wall
     Normal,
+    /// Border wall
+    Border,
 }
 
 impl Wall for SimpleWall {
     fn is_cliff(&self) -> bool {
         match *self {
             SimpleWall::Cliff => true,
-            SimpleWall::Normal => false,
+            _ => false,
+        }
+    }
+
+    fn is_border(&self) -> bool {
+        match *self {
+            SimpleWall::Border => true,
+            _ => false,
         }
     }
 }
